@@ -1,65 +1,131 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { SparklesIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { AnalysisResults } from "@/components/analysis-results";
+
+interface AnalysisResult {
+  curriculum: string;
+  email: string;
+  emailSubject: string;
+  emailBody: string;
+  recruiterEmail: string | null;
+}
 
 export default function Home() {
+  const [description, setDescription] = useState("");
+  const [curriculum, setCurriculum] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit() {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description, curriculum }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error ?? "Erro ao processar.");
+      }
+
+      const data: AnalysisResult = await res.json();
+      setResult(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+    <main className="container mx-auto max-w-7xl py-10 px-6">
+      <div className="mb-8 flex flex-col gap-3">
+        <Badge className="w-fit">TalentFlow AI</Badge>
+        <h1 className="text-4xl font-bold tracking-tight">
+          Otimize seu currículo para qualquer vaga.
+        </h1>
+        <p className="max-w-2xl text-muted-foreground">
+          Cole a descrição da vaga e o seu currículo em Markdown. A IA irá
+          adaptar seu currículo mantendo sua experiência verdadeira e
+          aumentar sua aderência à vaga.
+        </p>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Descrição da vaga</CardTitle>
+            <CardDescription>
+              Cole aqui o texto completo da vaga.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Cole aqui a descrição da vaga..."
+              className="min-h-[420px] resize-none"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Currículo</CardTitle>
+            <CardDescription>
+              Utilize Markdown para estruturar seu currículo.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              value={curriculum}
+              onChange={(e) => setCurriculum(e.target.value)}
+              placeholder={`# João Silva\n\n## Experiência\n\n### Desenvolvedor Full Stack\n- Ruby on Rails\n- React\n- PostgreSQL`}
+              className="min-h-[420px] resize-none font-mono"
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="mt-8 flex flex-col items-end gap-2">
+        {error && <p className="text-sm text-destructive">{error}</p>}
+        <Button
+          size="lg"
+          className="gap-2"
+          onClick={handleSubmit}
+          disabled={loading || !description.trim() || !curriculum.trim()}
+        >
+          <HugeiconsIcon icon={SparklesIcon} />
+          {loading ? "Analisando..." : "Analisar com IA"}
+        </Button>
+      </div>
+
+      {result && (
+        <AnalysisResults
+          curriculum={result.curriculum}
+          emailSubject={result.emailSubject}
+          emailBody={result.emailBody}
+          recruiterEmail={result.recruiterEmail}
+        />
+      )}
+    </main>
   );
 }
