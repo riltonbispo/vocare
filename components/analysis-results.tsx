@@ -51,6 +51,27 @@ export function AnalysisResults({
     window.location.href = url;
   }
 
+  async function downloadPdf() {
+    const res = await fetch("/api/pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        markdown: curriculum,
+        filename: "curriculo-otimizado",
+      }),
+    });
+
+    if (!res.ok) return;
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "curriculo-otimizado.pdf";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <section className="mt-16">
       <div className="mb-8">
@@ -142,6 +163,10 @@ export function AnalysisResults({
 
               <Button variant="outline" onClick={openMailClient} disabled={!to}>
                 Abrir cliente de e-mail padrão
+              </Button>
+
+              <Button variant="outline" onClick={downloadPdf}>
+                 Baixar PDF
               </Button>
             </CardContent>
           </Card>
