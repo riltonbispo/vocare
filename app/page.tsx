@@ -82,7 +82,7 @@ export default function Home() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Cole aqui a descrição da vaga..."
-              className="min-h-[420px] resize-none"
+              className="min-h-[420px] max-h-72 resize-none"
             />
           </CardContent>
         </Card>
@@ -99,7 +99,7 @@ export default function Home() {
               value={curriculum}
               onChange={(e) => setCurriculum(e.target.value)}
               placeholder={`# João Silva\n\n## Experiência\n\n### Desenvolvedor Full Stack\n- Ruby on Rails\n- React\n- PostgreSQL`}
-              className="min-h-[420px] resize-none font-mono"
+              className="min-h-[420px] max-h-72 resize-none font-mono"
             />
           </CardContent>
         </Card>
