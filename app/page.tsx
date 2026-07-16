@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -10,6 +10,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { SparklesIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -26,20 +27,80 @@ interface AnalysisResult {
 export default function Home() {
   const [description, setDescription] = useState("");
   const [curriculum, setCurriculum] = useState("");
+  const [curriculumFile, setCurriculumFile] = useState<File | null>(null);
+  const [curriculumFileInputKey, setCurriculumFileInputKey] = useState(0);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const hasCurriculum = Boolean(curriculum.trim() || curriculumFile);
+
+  function resetCurriculumFile() {
+    setCurriculumFile(null);
+    setCurriculumFileInputKey((key) => key + 1);
+  }
+
+  async function handleCurriculumFileChange(
+    event: ChangeEvent<HTMLInputElement>
+  ) {
+    const file = event.target.files?.[0] ?? null;
+
+    setError(null);
+
+    if (!file) {
+      resetCurriculumFile();
+      return;
+    }
+
+    if (
+      file.type === "application/pdf" ||
+      file.name.toLowerCase().endsWith(".pdf")
+    ) {
+      setCurriculumFile(file);
+      return;
+    }
+
+    if (
+      ["text/markdown", "text/plain"].includes(file.type) ||
+      /\.(md|markdown|txt)$/i.test(file.name)
+    ) {
+      try {
+        setCurriculum(await file.text());
+        resetCurriculumFile();
+      } catch {
+        setError("Não foi possível ler o arquivo selecionado.");
+      }
+
+      return;
+    }
+
+    setError("Envie um currículo em PDF, Markdown ou TXT.");
+    resetCurriculumFile();
+  }
 
   async function handleSubmit() {
     setLoading(true);
     setError(null);
 
     try {
-      const res = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description, curriculum }),
-      });
+      const formData = new FormData();
+      formData.append("description", description);
+      formData.append("curriculum", curriculum);
+
+      if (curriculumFile) {
+        formData.append("curriculumFile", curriculumFile);
+      }
+
+      const res = curriculumFile
+        ? await fetch("/api/analyze", {
+            method: "POST",
+            body: formData,
+          })
+        : await fetch("/api/analyze", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ description, curriculum }),
+          });
 
       if (!res.ok) {
         const data = await res.json();
@@ -63,8 +124,8 @@ export default function Home() {
           Otimize seu currículo para qualquer vaga.
         </h1>
         <p className="max-w-2xl text-muted-foreground">
-          Cole a descrição da vaga e o seu currículo em Markdown. A IA irá
-          adaptar seu currículo mantendo sua experiência verdadeira e
+          Cole a descrição da vaga e envie seu currículo em PDF ou Markdown. A
+          IA irá adaptar seu currículo mantendo sua experiência verdadeira e
           aumentar sua aderência à vaga.
         </p>
       </div>
@@ -91,15 +152,48 @@ export default function Home() {
           <CardHeader>
             <CardTitle>Currículo</CardTitle>
             <CardDescription>
-              Utilize Markdown para estruturar seu currículo.
+              Cole em Markdown ou selecione um arquivo PDF.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 rounded-xl border border-dashed border-border p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-sm font-medium">Arquivo</p>
+                <p className="truncate text-sm text-muted-foreground">
+                  {curriculumFile
+                    ? curriculumFile.name
+                    : "PDF, Markdown ou TXT"}
+                </p>
+              </div>
+              <div className="flex flex-col gap-2 sm:w-64">
+                <Input
+                  key={curriculumFileInputKey}
+                  type="file"
+                  accept=".pdf,.md,.markdown,.txt,application/pdf,text/markdown,text/plain"
+                  onChange={handleCurriculumFileChange}
+                />
+                {curriculumFile && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={resetCurriculumFile}
+                  >
+                    Remover PDF
+                  </Button>
+                )}
+              </div>
+            </div>
             <Textarea
-              value={curriculum}
+              value={curriculumFile ? "" : curriculum}
               onChange={(e) => setCurriculum(e.target.value)}
-              placeholder={`# João Silva\n\n## Experiência\n\n### Desenvolvedor Full Stack\n- Ruby on Rails\n- React\n- PostgreSQL`}
-              className="min-h-[420px] max-h-72 resize-none font-mono"
+              placeholder={
+                curriculumFile
+                  ? "PDF selecionado para análise."
+                  : `# João Silva\n\n## Experiência\n\n### Desenvolvedor Full Stack\n- Ruby on Rails\n- React\n- PostgreSQL`
+              }
+              disabled={Boolean(curriculumFile)}
+              className="min-h-[420px] max-h-72 resize-none font-mono disabled:opacity-60"
             />
           </CardContent>
         </Card>
@@ -111,7 +205,7 @@ export default function Home() {
           size="lg"
           className="gap-2"
           onClick={handleSubmit}
-          disabled={loading || !description.trim() || !curriculum.trim()}
+          disabled={loading || !description.trim() || !hasCurriculum}
         >
           <HugeiconsIcon icon={SparklesIcon} />
           {loading ? "Analisando..." : "Analisar com IA"}

@@ -34,15 +34,18 @@ export function AnalysisResults({
   const [copied, setCopied] = useState<"curriculum" | "email" | null>(null);
   const [to, setTo] = useState(recruiterEmail ?? "");
 
-
   async function copy(text: string, which: "curriculum" | "email") {
     await navigator.clipboard.writeText(text);
     setCopied(which);
     setTimeout(() => setCopied(null), 1500);
   }
 
-    function openGmail() {
-    const url = buildGmailComposeUrl({ to, subject: emailSubject, body: emailBody });
+  function openGmail() {
+    const url = buildGmailComposeUrl({
+      to,
+      subject: emailSubject,
+      body: emailBody,
+    });
     window.open(url, "_blank");
   }
 
@@ -129,49 +132,54 @@ export function AnalysisResults({
                 >
                   Baixar Markdown
                 </Button>
+                <Button variant="outline" onClick={downloadPdf}>
+                  Baixar PDF
+                </Button>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
-      <TabsContent value="email">
-        <div className="grid gap-8 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
-            <CardContent className="p-8">
-              <span className="font-bold">EMAIL.md</span>
-              <div className="divider my-4 border-t" />
-              <p className="mb-2 text-sm font-medium">Assunto: {emailSubject}</p>
-              <article className="prose max-w-none whitespace-pre-line">
-                {emailBody}
-              </article>
-            </CardContent>
-          </Card>
+        <TabsContent value="email">
+          <div className="grid gap-8 lg:grid-cols-3">
+            <Card className="lg:col-span-2">
+              <CardContent className="p-8">
+                <span className="font-bold">EMAIL.md</span>
+                <div className="divider my-4 border-t" />
+                <p className="mb-2 text-sm font-medium">
+                  Assunto: {emailSubject}
+                </p>
+                <article className="prose max-w-none whitespace-pre-line">
+                  {emailBody}
+                </article>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardContent className="flex flex-col gap-3 p-8">
-              <h3 className="font-bold">Enviar</h3>
+            <Card>
+              <CardContent className="flex flex-col gap-3 p-8">
+                <h3 className="font-bold">Enviar</h3>
 
-              <Input
-                placeholder="destinatario@empresa.com"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-              />
+                <Input
+                  placeholder="destinatario@empresa.com"
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                />
 
-              <Button onClick={openGmail} disabled={!to} className="gap-2">
-                <HugeiconsIcon icon={Mail01Icon} />
-                Abrir no Gmail
-              </Button>
+                <Button onClick={openGmail} disabled={!to} className="gap-2">
+                  <HugeiconsIcon icon={Mail01Icon} />
+                  Abrir no Gmail
+                </Button>
 
-              <Button variant="outline" onClick={openMailClient} disabled={!to}>
-                Abrir cliente de e-mail padrão
-              </Button>
-
-              <Button variant="outline" onClick={downloadPdf}>
-                 Baixar PDF
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </TabsContent>
+                <Button
+                  variant="outline"
+                  onClick={openMailClient}
+                  disabled={!to}
+                >
+                  Abrir cliente de e-mail padrão
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
       </Tabs>
     </section>
   );
