@@ -1,36 +1,140 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Vocare
 
-## Getting Started
+Aplicação web para adaptar currículos a vagas específicas com IA. O usuário informa a descrição da vaga e envia o currículo em PDF, Markdown ou TXT; a aplicação gera um currículo otimizado em Markdown, um PDF para download e um e-mail de candidatura com os dados do próprio candidato.
 
-First, run the development server:
+## Funcionalidades
+
+- Análise da descrição da vaga e do currículo com Gemini.
+- Entrada de currículo por texto Markdown, arquivo `.md`, `.txt` ou `.pdf`.
+- Extração de conteúdo de PDF antes da otimização.
+- Geração de currículo otimizado em Markdown.
+- Exportação do currículo otimizado em PDF.
+- Geração de e-mail de candidatura com assunto, corpo e assinatura baseada nos contatos do currículo.
+- Abertura rápida do e-mail no Gmail ou no cliente padrão do sistema.
+
+## Stack
+
+- Next.js 16 com App Router
+- React 19
+- TypeScript
+- Tailwind CSS 4
+- Gemini 2.5 Flash
+- Puppeteer / Chromium para geração de PDF
+- shadcn/base-ui para componentes de interface
+
+## Requisitos
+
+- Node.js compatível com Next.js 16
+- npm
+- Chave de API do Gemini
+
+## Configuração
+
+Instale as dependências:
+
+```bash
+npm install
+```
+
+Crie um arquivo `.env.local` na raiz do projeto:
+
+```env
+GEMINI_API_KEY=sua_chave_do_gemini
+```
+
+## Rodando em desenvolvimento
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abra `http://localhost:3000` no navegador. Se a porta `3000` já estiver em uso, o Next.js pode sugerir outra porta.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run dev
+```
 
-## Learn More
+Inicia o servidor local de desenvolvimento.
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Gera a build de produção. Este comando pode precisar de acesso à internet para baixar fontes usadas pelo `next/font`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run start
+```
 
-## Deploy on Vercel
+Inicia a aplicação a partir da build de produção.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm run lint
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Executa o ESLint no projeto.
+
+## Como Usar
+
+1. Cole a descrição completa da vaga.
+2. Cole o currículo em Markdown ou selecione um arquivo PDF, Markdown ou TXT.
+3. Clique em `Analisar com IA`.
+4. Revise o currículo otimizado.
+5. Baixe o resultado em Markdown ou PDF.
+6. Revise o e-mail gerado e abra no Gmail ou no cliente de e-mail padrão.
+
+## Variáveis de Ambiente
+
+| Nome | Obrigatória | Descrição |
+| --- | --- | --- |
+| `GEMINI_API_KEY` | Sim | Chave usada nas chamadas ao Gemini para análise do currículo, extração de PDF e geração de e-mail. |
+
+## Rotas Principais
+
+| Rota | Método | Descrição |
+| --- | --- | --- |
+| `/` | `GET` | Interface principal da aplicação. |
+| `/api/analyze` | `POST` | Recebe descrição da vaga e currículo, processa com Gemini e retorna currículo/e-mail gerados. |
+| `/api/pdf` | `POST` | Recebe Markdown e retorna um PDF renderizado. |
+
+## Entrada de Arquivos
+
+A rota `/api/analyze` aceita dois formatos:
+
+- JSON com `description` e `curriculum`.
+- `multipart/form-data` com `description`, `curriculum` opcional e `curriculumFile`.
+
+Formatos aceitos para `curriculumFile`:
+
+- `.pdf`
+- `.md`
+- `.markdown`
+- `.txt`
+
+O tamanho máximo do arquivo é de 10 MB.
+
+## Estrutura do Projeto
+
+```text
+app/
+  api/
+    analyze/route.ts  # análise com Gemini e leitura de PDF/Markdown/TXT
+    pdf/route.ts      # geração de PDF a partir de Markdown
+  page.tsx            # tela principal
+components/
+  analysis-results.tsx
+  ui/
+lib/
+  email-utils.ts
+  pdf-template.ts
+  prompts.ts
+  utils.ts
+```
+
+## Observações
+
+- A geração de PDF usa `puppeteer` em desenvolvimento e `puppeteer-core` com `@sparticuz/chromium` em produção/serverless.
+- PDFs baseados em imagem ou digitalizados podem ter extração menos precisa.
+- O e-mail gerado deve assinar com os dados encontrados no currículo do candidato; dados ausentes são omitidos.
