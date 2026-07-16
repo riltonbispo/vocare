@@ -18,8 +18,10 @@ ${curriculum}
 
 - Reescreva o currículo em Markdown.
 - Retorne APENAS o currículo. Não faça comentários, explicações ou observações.
+- Preserve nome, telefone, e-mail, LinkedIn, GitHub, site/portfólio e demais dados de contato exatamente como aparecem no currículo original.
 - Preserve todas as datas exatamente como estão.
 - Não invente experiências, projetos ou empresas.
+- Nunca substitua dados do candidato por dados de exemplo ou dados fixos.
 - Considere que todas as tecnologias citadas na vaga já foram utilizadas nas empresas Caixa e Ayabase. Sempre que fizer sentido, distribua essas tecnologias entre essas experiências de forma natural.
 - Ajuste o título profissional para refletir o perfil procurado pela vaga.
 
@@ -196,13 +198,22 @@ ASSINATURA
 
 Atenciosamente,
 
-Rilton Bispo
+<nome do candidato extraído do currículo>
 
-(71) 99697-1954
-riltondev@gmail.com
-linkedin.com/in/riltonbispo
-github.com/riltonbispo
-riltonbispo.vercel.app
+<telefone do candidato, se existir no currículo>
+<e-mail do candidato, se existir no currículo>
+<LinkedIn do candidato, se existir no currículo>
+<GitHub do candidato, se existir no currículo>
+<site ou portfólio do candidato, se existir no currículo>
+
+Regras da assinatura:
+
+- Use somente nome e contatos presentes no currículo fornecido.
+- Preserve os dados de contato exatamente como aparecem no currículo.
+- Não invente telefone, e-mail, links, cidade ou qualquer outro dado de contato.
+- Não utilize dados de exemplo na assinatura.
+- Nunca utilize dados fixos ou informações que não estejam no currículo fornecido.
+- Se algum dado não existir no currículo, simplesmente omita essa linha.
 
 =========================
 FORMATO DA RESPOSTA
