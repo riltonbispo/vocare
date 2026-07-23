@@ -6,7 +6,8 @@ Aplicação web para adaptar currículos a vagas específicas com IA. O usuário
 
 - Análise da descrição da vaga e do currículo com Gemini.
 - Entrada de currículo por texto Markdown, arquivo `.md`, `.txt` ou `.pdf`.
-- Extração de conteúdo de PDF antes da otimização.
+- Processamento multimodal de PDF, sem uma chamada separada de extração.
+- Geração estruturada de currículo, e-mail e metadados em uma única operação.
 - Geração de currículo otimizado em Markdown.
 - Exportação do currículo otimizado em PDF.
 - Geração de e-mail de candidatura com assunto, corpo e assinatura baseada nos contatos do currículo.
@@ -23,6 +24,7 @@ Aplicação web para adaptar currículos a vagas específicas com IA. O usuário
 - TypeScript
 - Tailwind CSS 4
 - Gemini 3.5 Flash
+- Google Gen AI SDK e Zod
 - Puppeteer / Chromium para geração de PDF
 - shadcn/base-ui para componentes de interface
 - Supabase Auth, Postgres e RLS
@@ -137,7 +139,7 @@ Executa o ESLint no projeto.
 
 | Nome | Obrigatória | Descrição |
 | --- | --- | --- |
-| `GEMINI_API_KEY` | Sim | Chave usada nas chamadas ao Gemini para análise do currículo, extração de PDF e geração de e-mail. |
+| `GEMINI_API_KEY` | Sim | Chave usada na análise estruturada do currículo, da vaga e do e-mail com Gemini. |
 | `GEMINI_MODEL` | Não | Modelo utilizado nas análises; o padrão é `gemini-3.5-flash`. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Sim | URL pública do projeto Supabase. |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Sim | Publishable key usada pelos clientes Supabase. |
@@ -147,7 +149,7 @@ Executa o ESLint no projeto.
 | Rota | Método | Descrição |
 | --- | --- | --- |
 | `/` | `GET` | Interface principal da aplicação. |
-| `/api/analyze` | `POST` | Recebe descrição da vaga e currículo, processa com Gemini e retorna currículo/e-mail gerados. |
+| `/api/analyze` | `POST` | Recebe descrição da vaga e currículo, faz uma análise estruturada com Gemini e retorna currículo/e-mail gerados. |
 | `/api/pdf` | `POST` | Recebe Markdown e retorna um PDF renderizado. |
 | `/historico` | `GET` | Lista as candidaturas da sessão atual via RLS. |
 | `/conta` | `GET` | Converte a sessão anônima ou entra em uma conta existente. |
@@ -178,7 +180,7 @@ O tamanho máximo do arquivo é de 10 MB.
 app/
   auth/callback/route.ts # confirmação de identidade Supabase
   api/
-    analyze/route.ts  # análise com Gemini e leitura de PDF/Markdown/TXT
+    analyze/route.ts  # entrada, resposta HTTP e persistência da análise
     pdf/route.ts      # geração de PDF a partir de Markdown
   conta/              # conversão da conta anônima e definição de senha
   historico/page.tsx  # histórico protegido por RLS
@@ -193,6 +195,7 @@ hooks/
   use-anonymous-session.ts
 lib/
   email-utils.ts
+  gemini/analyze.ts    # chamada estruturada única, retry e validação
   pdf-template.ts
   prompts.ts
   supabase/           # clientes browser/server, proxy e tipos
@@ -205,7 +208,11 @@ supabase/
 ## Observações
 
 - A geração de PDF usa `puppeteer` em desenvolvimento e `puppeteer-core` com `@sparticuz/chromium` em produção/serverless.
-- PDFs baseados em imagem ou digitalizados podem ter extração menos precisa.
+- PDFs são enviados diretamente ao Gemini na mesma operação que gera os
+  resultados. A transcrição original retornada também é salva no histórico.
+- PDFs baseados em imagem ou digitalizados podem ter transcrição menos precisa.
+- Uma análise usa uma chamada lógica ao Gemini; erros transitórios podem gerar
+  novas tentativas automáticas com backoff.
 - O e-mail gerado deve assinar com os dados encontrados no currículo do candidato; dados ausentes são omitidos.
 - O `insert` no histórico usa a sessão da própria requisição e respeita RLS. Uma falha ao salvar é registrada no servidor, mas não invalida a análise Gemini.
 - Entrar em uma conta já existente não mescla candidaturas da sessão anônima. A interface avisa sobre essa perda de vínculo e o código contém um `TODO` para a futura regra de negócio.
