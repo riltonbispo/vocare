@@ -8,8 +8,13 @@ import { parseGeneratedEmail, extractEmailFromText } from "@/lib/email-utils";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash";
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`;
+const GEMINI_METADATA_MODEL =
+  process.env.GEMINI_METADATA_MODEL?.trim() || "gemini-3.5-flash-lite";
 const MAX_CURRICULUM_FILE_SIZE = 10 * 1024 * 1024;
+const GEMINI_MAX_RETRIES = 2;
+const RETRYABLE_GEMINI_STATUSES = new Set([
+  408, 429, 500, 502, 503, 504,
+]);
 
 type GeminiPart =
   | { text: string }
@@ -20,33 +25,100 @@ type ApplicationMetadata = {
   empresa: string | null;
 };
 
+type GeminiCallOptions = {
+  generationConfig?: Record<string, unknown>;
+  maxRetries?: number;
+  model?: string;
+  timeoutMs?: number;
+};
+
 class BadRequestError extends Error {}
+
+class GeminiApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly responseBody: string
+  ) {
+    super(`Gemini API error: ${status} ${responseBody}`);
+    this.name = "GeminiApiError";
+  }
+}
+
+function retryDelayMs(retryAfter: string | null, retryIndex: number) {
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return Math.min(seconds * 1_000, 10_000);
+    }
+
+    const date = Date.parse(retryAfter);
+    if (!Number.isNaN(date)) {
+      return Math.min(Math.max(date - Date.now(), 0), 10_000);
+    }
+  }
+
+  const exponentialDelay = 1_000 * 2 ** retryIndex;
+  const jitter = Math.floor(Math.random() * 250);
+  return exponentialDelay + jitter;
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 async function callGemini(
   promptOrParts: string | GeminiPart[],
-  generationConfig?: Record<string, unknown>
+  {
+    generationConfig,
+    maxRetries = GEMINI_MAX_RETRIES,
+    model = GEMINI_MODEL,
+    timeoutMs,
+  }: GeminiCallOptions = {}
 ) {
   const apiKey = process.env.GEMINI_API_KEY;
   const parts =
     typeof promptOrParts === "string"
       ? [{ text: promptOrParts }]
       : promptOrParts;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
 
-  const res = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts }],
-      ...(generationConfig ? { generationConfig } : {}),
-    }),
-  });
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    let res: Response;
 
-  if (!res.ok) {
-    throw new Error(`Gemini API error: ${res.status} ${await res.text()}`);
+    try {
+      res = await fetch(`${endpoint}?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined,
+        body: JSON.stringify({
+          contents: [{ parts }],
+          ...(generationConfig ? { generationConfig } : {}),
+        }),
+      });
+    } catch (error) {
+      if (attempt === maxRetries) throw error;
+
+      await wait(retryDelayMs(null, attempt));
+      continue;
+    }
+
+    if (!res.ok) {
+      const responseBody = await res.text();
+      const retryable = RETRYABLE_GEMINI_STATUSES.has(res.status);
+
+      if (retryable && attempt < maxRetries) {
+        await wait(retryDelayMs(res.headers.get("retry-after"), attempt));
+        continue;
+      }
+
+      throw new GeminiApiError(res.status, responseBody);
+    }
+
+    const json = await res.json();
+    return json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
   }
 
-  const json = await res.json();
-  return json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  throw new Error("A chamada ao Gemini terminou sem resposta.");
 }
 
 function isPdfFile(file: File) {
@@ -186,14 +258,19 @@ async function resolveApplicationMetadata({
     const response = await callGemini(
       buildApplicationMetadataPrompt(description),
       {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "OBJECT",
-          properties: {
-            vaga_titulo: { type: "STRING", nullable: true },
-            empresa: { type: "STRING", nullable: true },
+        model: GEMINI_METADATA_MODEL,
+        maxRetries: 0,
+        timeoutMs: 15_000,
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              vaga_titulo: { type: "STRING", nullable: true },
+              empresa: { type: "STRING", nullable: true },
+            },
+            required: ["vaga_titulo", "empresa"],
           },
-          required: ["vaga_titulo", "empresa"],
         },
       }
     );
@@ -204,9 +281,16 @@ async function resolveApplicationMetadata({
       empresa: providedCompany ?? inferred.empresa,
     };
   } catch (metadataError) {
-    console.error(
+    const reason =
+      metadataError instanceof GeminiApiError
+        ? `Gemini respondeu com status ${metadataError.status}.`
+        : metadataError instanceof Error
+          ? metadataError.message
+          : "Erro desconhecido.";
+
+    console.warn(
       "[candidaturas] Não foi possível inferir título e empresa da vaga.",
-      metadataError
+      reason
     );
 
     return { vagaTitulo: providedTitle, empresa: providedCompany };
@@ -279,20 +363,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const metadataPromise = resolveApplicationMetadata({
-      vagaTitulo,
-      empresa,
-      description,
-    });
-
     const resultCurriculum = await callGemini(
       buildCurriculumPrompt(description, curriculum)
     );
 
-    const [resultEmail, metadata] = await Promise.all([
-      callGemini(buildEmailPrompt(description, resultCurriculum)),
-      metadataPromise,
-    ]);
+    const resultEmail = await callGemini(
+      buildEmailPrompt(description, resultCurriculum)
+    );
+
+    const metadata = await resolveApplicationMetadata({
+      vagaTitulo,
+      empresa,
+      description,
+    });
 
     const { subject, body } = parseGeneratedEmail(resultEmail);
     const recruiterEmail = extractEmailFromText(description);
@@ -318,6 +401,30 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof BadRequestError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    if (error instanceof GeminiApiError) {
+      console.error("[gemini] Falha após as tentativas de recuperação.", error);
+
+      if (error.status === 429) {
+        return NextResponse.json(
+          {
+            error:
+              "O limite temporário do serviço de IA foi atingido. Aguarde alguns instantes e tente novamente.",
+          },
+          { status: 429, headers: { "Retry-After": "5" } }
+        );
+      }
+
+      if (RETRYABLE_GEMINI_STATUSES.has(error.status)) {
+        return NextResponse.json(
+          {
+            error:
+              "O serviço de IA está temporariamente indisponível. Aguarde alguns instantes e tente novamente.",
+          },
+          { status: 503, headers: { "Retry-After": "5" } }
+        );
+      }
     }
 
     console.error(error);
