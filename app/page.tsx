@@ -11,10 +11,12 @@ import {
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { SparklesIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { AnalysisResults } from "@/components/analysis-results";
+import { useAnonymousSession } from "@/hooks/use-anonymous-session";
 
 interface AnalysisResult {
   curriculum: string;
@@ -22,9 +24,18 @@ interface AnalysisResult {
   emailSubject: string;
   emailBody: string;
   recruiterEmail: string | null;
+  vagaTitulo: string | null;
+  empresa: string | null;
 }
 
 export default function Home() {
+  const {
+    session,
+    loading: sessionLoading,
+    error: sessionError,
+  } = useAnonymousSession();
+  const [vagaTitulo, setVagaTitulo] = useState("");
+  const [empresa, setEmpresa] = useState("");
   const [description, setDescription] = useState("");
   const [curriculum, setCurriculum] = useState("");
   const [curriculumFile, setCurriculumFile] = useState<File | null>(null);
@@ -79,11 +90,18 @@ export default function Home() {
   }
 
   async function handleSubmit() {
+    if (!session) {
+      setError(sessionError ?? "Aguarde enquanto preparamos sua sessão.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
       const formData = new FormData();
+      formData.append("vagaTitulo", vagaTitulo);
+      formData.append("empresa", empresa);
       formData.append("description", description);
       formData.append("curriculum", curriculum);
 
@@ -99,7 +117,12 @@ export default function Home() {
         : await fetch("/api/analyze", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ description, curriculum }),
+            body: JSON.stringify({
+              vagaTitulo,
+              empresa,
+              description,
+              curriculum,
+            }),
           });
 
       if (!res.ok) {
@@ -109,6 +132,8 @@ export default function Home() {
 
       const data: AnalysisResult = await res.json();
       setResult(data);
+      setVagaTitulo((current) => current.trim() || data.vagaTitulo || "");
+      setEmpresa((current) => current.trim() || data.empresa || "");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido.");
     } finally {
@@ -128,6 +153,33 @@ export default function Home() {
           IA irá adaptar seu currículo mantendo sua experiência verdadeira e
           aumentar sua aderência à vaga.
         </p>
+      </div>
+
+      <div className="mb-6 grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-2">
+          <Label htmlFor="vaga-titulo">Título da vaga (opcional)</Label>
+          <Input
+            id="vaga-titulo"
+            value={vagaTitulo}
+            onChange={(event) => setVagaTitulo(event.target.value)}
+            placeholder="Ex.: Desenvolvedor Full Stack"
+          />
+          <p className="text-xs text-muted-foreground">
+            Se ficar vazio, será identificado pela descrição.
+          </p>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="empresa">Empresa (opcional)</Label>
+          <Input
+            id="empresa"
+            value={empresa}
+            onChange={(event) => setEmpresa(event.target.value)}
+            placeholder="Ex.: Acme"
+          />
+          <p className="text-xs text-muted-foreground">
+            Se ficar vazio, será identificado pela descrição.
+          </p>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -200,15 +252,23 @@ export default function Home() {
       </div>
 
       <div className="mt-8 flex flex-col items-end gap-2">
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {(error || sessionError) && (
+          <p className="text-sm text-destructive">{error ?? sessionError}</p>
+        )}
         <Button
           size="lg"
           className="gap-2"
           onClick={handleSubmit}
-          disabled={loading || !description.trim() || !hasCurriculum}
+          disabled={
+            loading || sessionLoading || !description.trim() || !hasCurriculum
+          }
         >
           <HugeiconsIcon icon={SparklesIcon} />
-          {loading ? "Analisando..." : "Analisar com IA"}
+          {sessionLoading
+            ? "Preparando sessão..."
+            : loading
+              ? "Analisando..."
+              : "Analisar com IA"}
         </Button>
       </div>
 

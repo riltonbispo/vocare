@@ -1,3 +1,21 @@
+export function buildApplicationMetadataPrompt(description: string) {
+  return `Extraia os dados de identificação da oportunidade abaixo.
+
+## Descrição da vaga
+
+${description}
+
+## Regras
+
+- Retorne um título de vaga curto e profissional, sem códigos internos, nível salarial ou localização.
+- Preserve a senioridade quando ela estiver indicada (Júnior, Pleno, Sênior, Lead etc.).
+- Retorne o nome da empresa quando estiver explícito no texto.
+- Se o nome não estiver escrito, você pode inferi-lo somente a partir de evidências fortes, como domínio de e-mail corporativo ou URL oficial presente na descrição.
+- Não use o nome de uma plataforma de empregos como empresa contratante.
+- Se não houver evidência suficiente para a empresa, retorne null. Nunca invente um nome.
+- Retorne somente o objeto JSON solicitado.`;
+}
+
 export function buildCurriculumPrompt(
   description: string,
   curriculum: string,
