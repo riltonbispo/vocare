@@ -26,19 +26,12 @@ import { ConversionBanner } from "@/components/conversion-banner";
 import { useAnonymousSession } from "@/hooks/use-anonymous-session";
 import { createClient } from "@/lib/supabase/client";
 import type { Candidatura } from "@/lib/supabase/database.types";
+import { applicationStatusLabels } from "@/lib/applications";
 
 type CandidaturaResumo = Pick<
   Candidatura,
   "id" | "vaga_titulo" | "empresa" | "status" | "created_at"
 >;
-
-const statusLabels: Record<string, string> = {
-  gerado: "Gerado",
-  enviado: "Enviado",
-  entrevista: "Entrevista",
-  rejeitado: "Rejeitado",
-  oferta: "Oferta",
-};
 
 const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
   dateStyle: "medium",
@@ -149,26 +142,36 @@ export default function HistoricoPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {candidaturas.map((candidatura) => (
-            <Card key={candidatura.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <CardTitle className="truncate">
-                      {candidatura.vaga_titulo || "Vaga sem título"}
-                    </CardTitle>
-                    <CardDescription className="mt-1 truncate">
-                      {candidatura.empresa || "Empresa não informada"}
-                    </CardDescription>
+            <Link
+              key={candidatura.id}
+              href={`/historico/${candidatura.id}`}
+              className="rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              aria-label={`Ver detalhes de ${
+                candidatura.vaga_titulo || "vaga sem título"
+              }`}
+            >
+              <Card className="h-full transition-colors hover:bg-muted/40">
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <CardTitle className="truncate">
+                        {candidatura.vaga_titulo || "Vaga sem título"}
+                      </CardTitle>
+                      <CardDescription className="mt-1 truncate">
+                        {candidatura.empresa || "Empresa não informada"}
+                      </CardDescription>
+                    </div>
+                    <Badge variant="secondary">
+                      {applicationStatusLabels[candidatura.status]}
+                    </Badge>
                   </div>
-                  <Badge variant="secondary">
-                    {statusLabels[candidatura.status] ?? candidatura.status}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="text-sm text-muted-foreground">
-                Gerado em {dateFormatter.format(new Date(candidatura.created_at))}
-              </CardContent>
-            </Card>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground">
+                  Analisado em{" "}
+                  {dateFormatter.format(new Date(candidatura.created_at))}
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
       )}

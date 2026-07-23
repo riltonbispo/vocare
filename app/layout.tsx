@@ -4,6 +4,8 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import { AnonymousSessionBootstrap } from "@/components/anonymous-session-bootstrap";
 import { SiteHeader } from "@/components/site-header";
+import { QueryProvider } from "@/components/query-provider";
+import { Toaster } from "@/components/ui/sonner";
 
 const ralewayHeading = Raleway({
   subsets: ["latin"],
@@ -46,9 +48,12 @@ export default function RootLayout({
       )}
     >
       <body className="flex min-h-full flex-col">
-        <AnonymousSessionBootstrap />
-        <SiteHeader />
-        <div className="flex-1">{children}</div>
+        <QueryProvider>
+          <AnonymousSessionBootstrap />
+          <SiteHeader />
+          <div className="flex-1">{children}</div>
+          <Toaster />
+        </QueryProvider>
       </body>
     </html>
   );

@@ -1,3 +1,18 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
+export type ApplicationStatus =
+  | "aplicado"
+  | "em_processo"
+  | "entrevista"
+  | "rejeitado"
+  | "arquivado";
+
 export type Database = {
   public: {
     Tables: {
@@ -9,9 +24,13 @@ export type Database = {
           empresa: string | null;
           descricao_vaga: string | null;
           curriculo_original: string | null;
+          curriculo_original_url: string | null;
           curriculo_otimizado: string | null;
           email_outreach: string | null;
-          status: string;
+          match_score: number | null;
+          gap_analysis: Json | null;
+          notas: string | null;
+          status: ApplicationStatus;
           created_at: string;
           updated_at: string;
         };
@@ -22,9 +41,13 @@ export type Database = {
           empresa?: string | null;
           descricao_vaga?: string | null;
           curriculo_original?: string | null;
+          curriculo_original_url?: string | null;
           curriculo_otimizado?: string | null;
           email_outreach?: string | null;
-          status?: string;
+          match_score?: number | null;
+          gap_analysis?: Json | null;
+          notas?: string | null;
+          status?: ApplicationStatus;
           created_at?: string;
           updated_at?: string;
         };
@@ -35,9 +58,13 @@ export type Database = {
           empresa?: string | null;
           descricao_vaga?: string | null;
           curriculo_original?: string | null;
+          curriculo_original_url?: string | null;
           curriculo_otimizado?: string | null;
           email_outreach?: string | null;
-          status?: string;
+          match_score?: number | null;
+          gap_analysis?: Json | null;
+          notas?: string | null;
+          status?: ApplicationStatus;
           created_at?: string;
           updated_at?: string;
         };
