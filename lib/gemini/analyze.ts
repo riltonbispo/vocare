@@ -5,7 +5,16 @@ import { buildAnalysisPrompt } from "@/lib/prompts";
 
 const GEMINI_MODEL =
   process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash";
+const GEMINI_FALLBACK_MODEL =
+  process.env.GEMINI_FALLBACK_MODEL?.trim() || null;
 const GEMINI_MAX_RETRIES = 2;
+const GEMINI_TIMEOUT_MS = parsePositiveInteger(
+  process.env.GEMINI_TIMEOUT_MS,
+  25_000,
+);
+
+// Default worst case: 3 * 25s timeouts + 1s + 2s backoff
+// + up to 0.5s of jitter, for a total of about 78.5 seconds.
 
 const analysisResponseSchema = {
   type: Type.OBJECT,
@@ -137,6 +146,34 @@ export class InvalidGeminiResponseError extends Error {
   }
 }
 
+class GeminiTimeoutError extends Error {
+  constructor(
+    readonly timeoutMs: number,
+    cause?: unknown,
+  ) {
+    super("Tempo limite excedido ao chamar o Gemini.");
+    this.name = "GeminiTimeoutError";
+
+    if (cause !== undefined) {
+      this.cause = cause;
+    }
+  }
+}
+
+function parsePositiveInteger(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+
+  if (
+    Number.isSafeInteger(parsed) &&
+    parsed > 0 &&
+    parsed <= 2_147_483_647
+  ) {
+    return parsed;
+  }
+
+  return fallback;
+}
+
 function wait(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
@@ -148,7 +185,23 @@ function retryDelayMs(retryIndex: number) {
   return exponentialDelay + jitter;
 }
 
+function isAbortOrTimeoutError(error: unknown) {
+  if (error instanceof GeminiTimeoutError) {
+    return true;
+  }
+
+  if (typeof error !== "object" || error === null || !("name" in error)) {
+    return false;
+  }
+
+  return error.name === "AbortError" || error.name === "TimeoutError";
+}
+
 function getErrorStatus(error: unknown) {
+  if (isAbortOrTimeoutError(error)) {
+    return null;
+  }
+
   if (
     typeof error !== "object" ||
     error === null ||
@@ -162,6 +215,10 @@ function getErrorStatus(error: unknown) {
 }
 
 function getErrorMessage(error: unknown) {
+  if (isAbortOrTimeoutError(error)) {
+    return "Tempo limite excedido ao chamar o Gemini.";
+  }
+
   if (error instanceof Error && error.message.trim()) {
     return error.message;
   }
@@ -170,6 +227,10 @@ function getErrorMessage(error: unknown) {
 }
 
 function isRetryableGeminiError(error: unknown) {
+  if (isAbortOrTimeoutError(error)) {
+    return true;
+  }
+
   const status = getErrorStatus(error);
 
   if (status === null) {
@@ -221,19 +282,36 @@ async function generateAnalysis(
     retryIndex += 1
   ) {
     const attempts = retryIndex + 1;
+    const hasRetriesLeft = retryIndex < GEMINI_MAX_RETRIES;
+    const isFallbackAttempt =
+      !hasRetriesLeft && GEMINI_FALLBACK_MODEL !== null;
+    const model = isFallbackAttempt
+      ? GEMINI_FALLBACK_MODEL
+      : GEMINI_MODEL;
     const attemptStartedAt = performance.now();
+    const abortController = new AbortController();
+    let timedOut = false;
+    let retryDelay: number | null = null;
 
     onProgress?.("attempt:start", {
       attempt: attempts,
       maxAttempts: GEMINI_MAX_RETRIES + 1,
-      model: GEMINI_MODEL,
+      model,
+      isFallbackModel: isFallbackAttempt,
+      timeoutMs: GEMINI_TIMEOUT_MS,
     });
+
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      abortController.abort();
+    }, GEMINI_TIMEOUT_MS);
 
     try {
       const response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
+        model,
         contents,
         config: {
+          abortSignal: abortController.signal,
           responseMimeType: "application/json",
           responseSchema: analysisResponseSchema,
         },
@@ -242,42 +320,56 @@ async function generateAnalysis(
       onProgress?.("attempt:response-received", {
         attempt: attempts,
         durationMs: Math.round(performance.now() - attemptStartedAt),
-        model: GEMINI_MODEL,
+        model,
         responseChars: response.text?.length ?? 0,
       });
 
       return { response, attempts };
     } catch (error) {
-      const hasRetriesLeft = retryIndex < GEMINI_MAX_RETRIES;
-      const retryable = isRetryableGeminiError(error);
-      const status = getErrorStatus(error);
+      const normalizedError = timedOut
+        ? new GeminiTimeoutError(GEMINI_TIMEOUT_MS, error)
+        : error;
+      const retryable = isRetryableGeminiError(normalizedError);
+      const status = getErrorStatus(normalizedError);
+
+      if (timedOut) {
+        onProgress?.("attempt:timeout", {
+          attempt: attempts,
+          timeoutMs: GEMINI_TIMEOUT_MS,
+          model,
+        });
+      }
 
       onProgress?.("attempt:error", {
         attempt: attempts,
         durationMs: Math.round(performance.now() - attemptStartedAt),
         status,
         retryable,
-        model: GEMINI_MODEL,
-        message: getErrorMessage(error),
+        model,
+        message: getErrorMessage(normalizedError),
       });
 
       if (hasRetriesLeft && retryable) {
-        const delayMs = retryDelayMs(retryIndex);
+        retryDelay = retryDelayMs(retryIndex);
 
         onProgress?.("retry:scheduled", {
           nextAttempt: attempts + 1,
-          delayMs,
+          delayMs: retryDelay,
         });
-        await wait(delayMs);
-        continue;
+      } else {
+        throw new GeminiApiError(
+          status ?? 503,
+          getErrorMessage(normalizedError),
+          attempts,
+          normalizedError,
+        );
       }
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
-      throw new GeminiApiError(
-        status ?? 503,
-        getErrorMessage(error),
-        attempts,
-        error,
-      );
+    if (retryDelay !== null) {
+      await wait(retryDelay);
     }
   }
 

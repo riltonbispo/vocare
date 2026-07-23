@@ -174,12 +174,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { result } = await analyzeWithGemini({
-      vagaTitulo,
-      empresa,
-      description,
-      curriculum,
-    });
+    const { result } = await analyzeWithGemini(
+      {
+        vagaTitulo,
+        empresa,
+        description,
+        curriculum,
+      },
+      {
+        onProgress(step, details) {
+          console.info(`[gemini] ${step}`, details ?? {});
+        },
+      },
+    );
 
     const resolvedJobTitle =
       optionalText(vagaTitulo) ?? optionalText(result.vagaTitulo);
