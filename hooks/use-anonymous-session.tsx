@@ -1,8 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { Session } from "@supabase/supabase-js";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import type { Session, User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
+
+type AnonymousSessionContextValue = {
+  session: Session | null;
+  user: User | null;
+  isAnonymous: boolean;
+  loading: boolean;
+  error: string | null;
+};
+
+const AnonymousSessionContext = createContext<
+  AnonymousSessionContextValue | undefined
+>(undefined);
 
 let bootstrapPromise: Promise<Session> | null = null;
 
@@ -48,7 +67,11 @@ async function getOrCreateSession() {
   return currentPromise;
 }
 
-export function useAnonymousSession() {
+export function AnonymousSessionProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -102,11 +125,32 @@ export function useAnonymousSession() {
     };
   }, []);
 
-  return {
-    session,
-    user: session?.user ?? null,
-    isAnonymous: session?.user.is_anonymous === true,
-    loading,
-    error,
-  };
+  const value = useMemo<AnonymousSessionContextValue>(
+    () => ({
+      session,
+      user: session?.user ?? null,
+      isAnonymous: session?.user.is_anonymous === true,
+      loading,
+      error,
+    }),
+    [error, loading, session],
+  );
+
+  return (
+    <AnonymousSessionContext.Provider value={value}>
+      {children}
+    </AnonymousSessionContext.Provider>
+  );
+}
+
+export function useAnonymousSession() {
+  const context = useContext(AnonymousSessionContext);
+
+  if (!context) {
+    throw new Error(
+      "useAnonymousSession deve ser usado dentro de AnonymousSessionProvider.",
+    );
+  }
+
+  return context;
 }

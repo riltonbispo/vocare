@@ -93,14 +93,12 @@ export type CurriculumInput =
       filename: string;
     };
 
-export type AnalyzeWithGeminiInput = {
+type AnalyzeWithGeminiInput = {
   description: string;
   vagaTitulo: string;
   empresa: string;
   curriculum: CurriculumInput;
 };
-
-export type GeminiAnalysisResult = z.infer<typeof analysisResultSchema>;
 
 type AnalysisProgressLogger = (
   step: string,

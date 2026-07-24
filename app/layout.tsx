@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Outfit, Raleway } from "next/font/google";
+import { Geist_Mono, Outfit, Raleway } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
-import { AnonymousSessionBootstrap } from "@/components/anonymous-session-bootstrap";
 import { SiteHeader } from "@/components/site-header";
 import { QueryProvider } from "@/components/query-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { AnonymousSessionProvider } from "@/hooks/use-anonymous-session";
 
 const ralewayHeading = Raleway({
   subsets: ["latin"],
@@ -13,11 +13,6 @@ const ralewayHeading = Raleway({
 });
 
 const outfit = Outfit({ subsets: ["latin"], variable: "--font-sans" });
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -40,7 +35,6 @@ export default function RootLayout({
       className={cn(
         "h-full",
         "antialiased",
-        geistSans.variable,
         geistMono.variable,
         "font-sans",
         outfit.variable,
@@ -49,9 +43,10 @@ export default function RootLayout({
     >
       <body className="flex min-h-full flex-col">
         <QueryProvider>
-          <AnonymousSessionBootstrap />
-          <SiteHeader />
-          <div className="flex-1">{children}</div>
+          <AnonymousSessionProvider>
+            <SiteHeader />
+            <div className="flex-1">{children}</div>
+          </AnonymousSessionProvider>
           <Toaster />
         </QueryProvider>
       </body>

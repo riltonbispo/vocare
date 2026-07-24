@@ -27,6 +27,7 @@ Aplicação web para adaptar currículos a vagas específicas com IA. O usuário
 - Google Gen AI SDK e Zod
 - Puppeteer / Chromium para geração de PDF
 - shadcn/base-ui para componentes de interface
+- TanStack Query para queries e mutations no detalhe das candidaturas
 - Supabase Auth, Postgres e RLS
 
 ## Requisitos
@@ -48,6 +49,8 @@ Copie `.env.example` para `.env.local` e preencha as chaves:
 ```env
 GEMINI_API_KEY=sua_chave_do_gemini
 GEMINI_MODEL=gemini-3.5-flash
+GEMINI_FALLBACK_MODEL=
+GEMINI_TIMEOUT_MS=25000
 NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sua_chave_publicavel_do_supabase
 ```
@@ -70,9 +73,14 @@ npx supabase start
 npx supabase db reset
 ```
 
-Para um projeto hospedado, vincule o projeto e envie as migrations com a CLI ou
-execute `supabase/migrations/20260720000000_create_candidaturas.sql` no SQL
-Editor. Depois, no Dashboard:
+Para um projeto hospedado, vincule o projeto e envie todas as migrations:
+
+```bash
+npx supabase link --project-ref seu-project-ref
+npx supabase db push
+```
+
+Depois, no Dashboard:
 
 1. Em **Authentication > Providers**, permita Anonymous Sign-Ins e Email.
 2. Habilite o vínculo manual de identidades.
@@ -141,6 +149,8 @@ Executa o ESLint no projeto.
 | --- | --- | --- |
 | `GEMINI_API_KEY` | Sim | Chave usada na análise estruturada do currículo, da vaga e do e-mail com Gemini. |
 | `GEMINI_MODEL` | Não | Modelo utilizado nas análises; o padrão é `gemini-3.5-flash`. |
+| `GEMINI_FALLBACK_MODEL` | Não | Modelo alternativo usado na última tentativa; vazio desabilita o fallback. |
+| `GEMINI_TIMEOUT_MS` | Não | Tempo limite de cada tentativa em milissegundos; o padrão é `25000`. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Sim | URL pública do projeto Supabase. |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Sim | Publishable key usada pelos clientes Supabase. |
 
@@ -151,7 +161,9 @@ Executa o ESLint no projeto.
 | `/` | `GET` | Interface principal da aplicação. |
 | `/api/analyze` | `POST` | Recebe descrição da vaga e currículo, faz uma análise estruturada com Gemini e retorna currículo/e-mail gerados. |
 | `/api/pdf` | `POST` | Recebe Markdown e retorna um PDF renderizado. |
+| `/api/applications/[id]` | `GET`, `PATCH` | Consulta e atualiza status/notas de uma candidatura da sessão atual. |
 | `/historico` | `GET` | Lista as candidaturas da sessão atual via RLS. |
+| `/historico/[id]` | `GET` | Exibe materiais, resultado e acompanhamento de uma candidatura. |
 | `/conta` | `GET` | Converte a sessão anônima ou entra em uma conta existente. |
 | `/conta/confirmar` | `GET` | Define a senha depois da confirmação do e-mail. |
 | `/auth/callback` | `GET` | Troca o código de confirmação por uma sessão Supabase. |
@@ -181,14 +193,16 @@ app/
   auth/callback/route.ts # confirmação de identidade Supabase
   api/
     analyze/route.ts  # entrada, resposta HTTP e persistência da análise
+    applications/[id]/route.ts # consulta e edição de candidatura
     pdf/route.ts      # geração de PDF a partir de Markdown
   conta/              # conversão da conta anônima e definição de senha
-  historico/page.tsx  # histórico protegido por RLS
+  historico/          # listagem e detalhe protegidos por RLS
   page.tsx            # tela principal
 components/
   analysis-results.tsx
-  anonymous-session-bootstrap.tsx
+  application-detail-view.tsx
   conversion-banner.tsx
+  query-provider.tsx
   site-header.tsx
   ui/
 hooks/

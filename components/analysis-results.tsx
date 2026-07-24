@@ -9,15 +9,10 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Mail01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { buildGmailComposeUrl, buildMailtoUrl } from "@/lib/email-utils";
+import { triggerBlobDownload } from "@/lib/browser/download";
 
 function downloadFile(content: string, filename: string, type: string) {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  triggerBlobDownload(new Blob([content], { type }), filename);
 }
 
 export function AnalysisResults({
@@ -66,13 +61,7 @@ export function AnalysisResults({
 
     if (!res.ok) return;
 
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "curriculo-otimizado.pdf";
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerBlobDownload(await res.blob(), "curriculo-otimizado.pdf");
   }
 
   return (

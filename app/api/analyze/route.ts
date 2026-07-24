@@ -7,6 +7,7 @@ import {
   type CurriculumInput,
 } from "@/lib/gemini/analyze";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
+import { classifyCurriculumFile } from "@/lib/curriculum-files";
 
 const MAX_CURRICULUM_FILE_SIZE = 10 * 1024 * 1024;
 const RETRYABLE_GEMINI_STATUSES = new Set([
@@ -15,25 +16,14 @@ const RETRYABLE_GEMINI_STATUSES = new Set([
 
 class BadRequestError extends Error {}
 
-function isPdfFile(file: File) {
-  return (
-    file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
-  );
-}
-
-function isTextCurriculumFile(file: File) {
-  return (
-    ["text/markdown", "text/plain"].includes(file.type) ||
-    /\.(md|markdown|txt)$/i.test(file.name)
-  );
-}
-
 async function readCurriculumFile(file: File): Promise<CurriculumInput> {
   if (file.size > MAX_CURRICULUM_FILE_SIZE) {
     throw new BadRequestError("O arquivo deve ter no máximo 10 MB.");
   }
 
-  if (isPdfFile(file)) {
+  const fileKind = classifyCurriculumFile(file);
+
+  if (fileKind === "pdf") {
     return {
       kind: "pdf",
       filename: file.name,
@@ -42,7 +32,7 @@ async function readCurriculumFile(file: File): Promise<CurriculumInput> {
     };
   }
 
-  if (isTextCurriculumFile(file)) {
+  if (fileKind === "text") {
     return { kind: "text", content: await file.text() };
   }
 

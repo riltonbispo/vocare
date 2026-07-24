@@ -17,6 +17,10 @@ import { SparklesIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { AnalysisResults } from "@/components/analysis-results";
 import { useAnonymousSession } from "@/hooks/use-anonymous-session";
+import {
+  classifyCurriculumFile,
+  CURRICULUM_FILE_ACCEPT,
+} from "@/lib/curriculum-files";
 
 interface AnalysisResult {
   curriculum: string;
@@ -63,18 +67,14 @@ export default function Home() {
       return;
     }
 
-    if (
-      file.type === "application/pdf" ||
-      file.name.toLowerCase().endsWith(".pdf")
-    ) {
+    const fileKind = classifyCurriculumFile(file);
+
+    if (fileKind === "pdf") {
       setCurriculumFile(file);
       return;
     }
 
-    if (
-      ["text/markdown", "text/plain"].includes(file.type) ||
-      /\.(md|markdown|txt)$/i.test(file.name)
-    ) {
+    if (fileKind === "text") {
       try {
         setCurriculum(await file.text());
         resetCurriculumFile();
@@ -221,7 +221,7 @@ export default function Home() {
                 <Input
                   key={curriculumFileInputKey}
                   type="file"
-                  accept=".pdf,.md,.markdown,.txt,application/pdf,text/markdown,text/plain"
+                  accept={CURRICULUM_FILE_ACCEPT}
                   onChange={handleCurriculumFileChange}
                 />
                 {curriculumFile && (
