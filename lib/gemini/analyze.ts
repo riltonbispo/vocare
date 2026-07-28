@@ -3,18 +3,18 @@ import { z } from "zod";
 
 import { buildAnalysisPrompt } from "@/lib/prompts";
 
-const GEMINI_MODEL =
-  process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash";
-const GEMINI_FALLBACK_MODEL =
-  process.env.GEMINI_FALLBACK_MODEL?.trim() || null;
-const GEMINI_MAX_RETRIES = 2;
+const DEFAULT_GEMINI_MODELS = [
+  "gemini-3.6-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-2.5-flash",
+] as const;
+const GEMINI_MODELS = resolveGeminiModels();
 const GEMINI_TIMEOUT_MS = parsePositiveInteger(
   process.env.GEMINI_TIMEOUT_MS,
   25_000,
 );
 
-// Default worst case: 3 * 25s timeouts + 1s + 2s backoff
-// + up to 0.5s of jitter, for a total of about 78.5 seconds.
+// Default worst case: 3 models * 25s per-model timeout = about 75 seconds.
 
 const analysisResponseSchema = {
   type: Type.OBJECT,
@@ -158,6 +158,34 @@ class GeminiTimeoutError extends Error {
   }
 }
 
+function uniqueModels(models: Array<string | undefined>) {
+  return Array.from(
+    new Set(
+      models
+        .map((model) => model?.trim())
+        .filter((model): model is string => Boolean(model)),
+    ),
+  );
+}
+
+function resolveGeminiModels() {
+  const configuredModels = uniqueModels(
+    process.env.GEMINI_MODELS?.split(",") ?? [],
+  );
+
+  if (configuredModels.length > 0) {
+    return configuredModels;
+  }
+
+  // Keep deployments using the previous variables working while ensuring
+  // they also receive the new default fallback chain.
+  return uniqueModels([
+    process.env.GEMINI_MODEL,
+    process.env.GEMINI_FALLBACK_MODEL,
+    ...DEFAULT_GEMINI_MODELS,
+  ]);
+}
+
 function parsePositiveInteger(value: string | undefined, fallback: number) {
   const parsed = Number(value);
 
@@ -170,17 +198,6 @@ function parsePositiveInteger(value: string | undefined, fallback: number) {
   }
 
   return fallback;
-}
-
-function wait(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
-}
-
-function retryDelayMs(retryIndex: number) {
-  const exponentialDelay = 1_000 * 2 ** retryIndex;
-  const jitter = Math.floor(Math.random() * 250);
-
-  return exponentialDelay + jitter;
 }
 
 function isAbortOrTimeoutError(error: unknown) {
@@ -224,7 +241,7 @@ function getErrorMessage(error: unknown) {
   return "Falha de rede ao chamar o Gemini.";
 }
 
-function isRetryableGeminiError(error: unknown) {
+function canTryNextGeminiModel(error: unknown) {
   if (isAbortOrTimeoutError(error)) {
     return true;
   }
@@ -236,6 +253,7 @@ function isRetryableGeminiError(error: unknown) {
   }
 
   return (
+    status === 404 ||
     status === 408 ||
     status === 429 ||
     (status >= 500 && status <= 599)
@@ -272,30 +290,24 @@ ${input.curriculum.content}`,
 async function generateAnalysis(
   ai: GoogleGenAI,
   contents: GeminiRequestPart[],
+  curriculumKind: CurriculumInput["kind"],
   onProgress?: AnalysisProgressLogger,
 ) {
-  for (
-    let retryIndex = 0;
-    retryIndex <= GEMINI_MAX_RETRIES;
-    retryIndex += 1
-  ) {
-    const attempts = retryIndex + 1;
-    const hasRetriesLeft = retryIndex < GEMINI_MAX_RETRIES;
-    const isFallbackAttempt =
-      !hasRetriesLeft && GEMINI_FALLBACK_MODEL !== null;
-    const model = isFallbackAttempt
-      ? GEMINI_FALLBACK_MODEL
-      : GEMINI_MODEL;
+  for (const [modelIndex, model] of GEMINI_MODELS.entries()) {
+    const attempts = modelIndex + 1;
+    const hasModelsLeft = modelIndex < GEMINI_MODELS.length - 1;
+    const nextModel = hasModelsLeft
+      ? GEMINI_MODELS[modelIndex + 1]
+      : null;
     const attemptStartedAt = performance.now();
     const abortController = new AbortController();
     let timedOut = false;
-    let retryDelay: number | null = null;
 
     onProgress?.("attempt:start", {
       attempt: attempts,
-      maxAttempts: GEMINI_MAX_RETRIES + 1,
+      maxAttempts: GEMINI_MODELS.length,
       model,
-      isFallbackModel: isFallbackAttempt,
+      isFallbackModel: modelIndex > 0,
       timeoutMs: GEMINI_TIMEOUT_MS,
     });
 
@@ -322,12 +334,47 @@ async function generateAnalysis(
         responseChars: response.text?.length ?? 0,
       });
 
-      return { response, attempts };
+      onProgress?.("response:validation:start", {
+        attempt: attempts,
+        model,
+      });
+
+      try {
+        const result = parseAnalysisResult(response.text, curriculumKind);
+
+        onProgress?.("response:validation:complete", {
+          attempt: attempts,
+          model,
+        });
+
+        return { result, attempts, model };
+      } catch (error) {
+        onProgress?.("response:validation:error", {
+          attempt: attempts,
+          model,
+          message: getErrorMessage(error),
+        });
+
+        if (hasModelsLeft) {
+          onProgress?.("model:fallback", {
+            fromModel: model,
+            toModel: nextModel,
+            reason: "invalid-response",
+          });
+          continue;
+        }
+
+        throw error;
+      }
     } catch (error) {
+      if (error instanceof InvalidGeminiResponseError) {
+        throw error;
+      }
+
       const normalizedError = timedOut
         ? new GeminiTimeoutError(GEMINI_TIMEOUT_MS, error)
         : error;
-      const retryable = isRetryableGeminiError(normalizedError);
+      const canTryNextModel = canTryNextGeminiModel(normalizedError);
       const status = getErrorStatus(normalizedError);
 
       if (timedOut) {
@@ -342,17 +389,17 @@ async function generateAnalysis(
         attempt: attempts,
         durationMs: Math.round(performance.now() - attemptStartedAt),
         status,
-        retryable,
+        retryable: canTryNextModel,
         model,
         message: getErrorMessage(normalizedError),
       });
 
-      if (hasRetriesLeft && retryable) {
-        retryDelay = retryDelayMs(retryIndex);
-
-        onProgress?.("retry:scheduled", {
-          nextAttempt: attempts + 1,
-          delayMs: retryDelay,
+      if (hasModelsLeft && canTryNextModel) {
+        onProgress?.("model:fallback", {
+          fromModel: model,
+          toModel: nextModel,
+          reason: "request-error",
+          status,
         });
       } else {
         throw new GeminiApiError(
@@ -365,16 +412,12 @@ async function generateAnalysis(
     } finally {
       clearTimeout(timeoutId);
     }
-
-    if (retryDelay !== null) {
-      await wait(retryDelay);
-    }
   }
 
   throw new GeminiApiError(
     503,
     "A chamada ao Gemini terminou sem resposta.",
-    GEMINI_MAX_RETRIES + 1,
+    GEMINI_MODELS.length,
   );
 }
 
@@ -433,7 +476,9 @@ export async function analyzeWithGemini(
     );
   }
 
-  onProgress?.("configuration:complete");
+  onProgress?.("configuration:complete", {
+    models: GEMINI_MODELS,
+  });
   onProgress?.("client:create:start");
   const ai = new GoogleGenAI({ apiKey });
   onProgress?.("client:create:complete");
@@ -450,15 +495,12 @@ export async function analyzeWithGemini(
         : input.curriculum.data.length,
   });
 
-  const { response, attempts } = await generateAnalysis(
+  const { result, attempts, model } = await generateAnalysis(
     ai,
     contents,
+    input.curriculum.kind,
     onProgress,
   );
 
-  onProgress?.("response:validation:start");
-  const result = parseAnalysisResult(response.text, input.curriculum.kind);
-  onProgress?.("response:validation:complete");
-
-  return { result, attempts };
+  return { result, attempts, model };
 }

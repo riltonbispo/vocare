@@ -48,14 +48,33 @@ Copie `.env.example` para `.env.local` e preencha as chaves:
 
 ```env
 GEMINI_API_KEY=sua_chave_do_gemini
-GEMINI_MODEL=gemini-3.5-flash
-GEMINI_FALLBACK_MODEL=
+GEMINI_MODELS=gemini-3.6-flash,gemini-3.5-flash-lite,gemini-2.5-flash
 GEMINI_TIMEOUT_MS=25000
 NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sua_chave_publicavel_do_supabase
 ```
 
 Não use a secret key ou uma service role key nas variáveis `NEXT_PUBLIC_*`.
+
+### Modelos Gemini
+
+A aplicação usa os modelos de `GEMINI_MODELS` na ordem informada e avança
+automaticamente quando uma tentativa não pode ser concluída.
+
+Modelos gerais compatíveis com o fluxo atual de PDF, texto e resposta JSON
+estruturada:
+
+- `gemini-3.6-flash`: modelo principal recomendado;
+- `gemini-3.5-flash-lite`: alternativa rápida e econômica para documentos;
+- `gemini-3.5-flash`: alternativa de maior qualidade, sujeita a picos de demanda;
+- `gemini-3.1-flash-lite`: alternativa estável de baixo custo;
+- `gemini-2.5-flash`: alternativa madura para compatibilidade;
+- `gemini-2.5-flash-lite`: alternativa econômica da família 2.5;
+- `gemini-2.5-pro`: alternativa de maior custo e latência.
+
+Evite modelos especializados em imagem, TTS ou robótica. Também evite versões
+`preview`, aliases `latest` e modelos 2.0 em produção, pois podem mudar ou ser
+descontinuados com menor previsibilidade.
 
 ### Configuração do Supabase
 
@@ -148,8 +167,7 @@ Executa o ESLint no projeto.
 | Nome | Obrigatória | Descrição |
 | --- | --- | --- |
 | `GEMINI_API_KEY` | Sim | Chave usada na análise estruturada do currículo, da vaga e do e-mail com Gemini. |
-| `GEMINI_MODEL` | Não | Modelo utilizado nas análises; o padrão é `gemini-3.5-flash`. |
-| `GEMINI_FALLBACK_MODEL` | Não | Modelo alternativo usado na última tentativa; vazio desabilita o fallback. |
+| `GEMINI_MODELS` | Não | Lista ordenada, separada por vírgulas, dos modelos usados na análise. Em erros transitórios, modelo ausente ou resposta inválida, a rota tenta o próximo. O padrão é `gemini-3.6-flash,gemini-3.5-flash-lite,gemini-2.5-flash`. |
 | `GEMINI_TIMEOUT_MS` | Não | Tempo limite de cada tentativa em milissegundos; o padrão é `25000`. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Sim | URL pública do projeto Supabase. |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Sim | Publishable key usada pelos clientes Supabase. |
