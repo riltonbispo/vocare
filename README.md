@@ -179,7 +179,7 @@ Executa o ESLint no projeto.
 | `/` | `GET` | Interface principal da aplicação. |
 | `/api/analyze` | `POST` | Recebe descrição da vaga e currículo, faz uma análise estruturada com Gemini e retorna currículo/e-mail gerados. |
 | `/api/pdf` | `POST` | Recebe Markdown e retorna um PDF renderizado. |
-| `/api/applications/[id]` | `GET`, `PATCH` | Consulta e atualiza status/notas de uma candidatura da sessão atual. |
+| `/api/applications/[id]` | `GET`, `PATCH`, `DELETE` | Consulta, atualiza ou exclui uma candidatura da sessão atual. |
 | `/historico` | `GET` | Lista as candidaturas da sessão atual via RLS. |
 | `/historico/[id]` | `GET` | Exibe materiais, resultado e acompanhamento de uma candidatura. |
 | `/conta` | `GET` | Converte a sessão anônima ou entra em uma conta existente. |
@@ -211,7 +211,7 @@ app/
   auth/callback/route.ts # confirmação de identidade Supabase
   api/
     analyze/route.ts  # entrada, resposta HTTP e persistência da análise
-    applications/[id]/route.ts # consulta e edição de candidatura
+    applications/[id]/route.ts # consulta, edição e exclusão de candidatura
     pdf/route.ts      # geração de PDF a partir de Markdown
   conta/              # conversão da conta anônima e definição de senha
   historico/          # listagem e detalhe protegidos por RLS

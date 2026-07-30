@@ -154,3 +154,51 @@ export async function PATCH(
 
   return NextResponse.json({ application: data });
 }
+
+export async function DELETE(
+  _request: NextRequest,
+  context: RouteContext<"/api/applications/[id]">,
+) {
+  const parsedId = idSchema.safeParse((await context.params).id);
+
+  if (!parsedId.success) {
+    return NextResponse.json(
+      { error: "Identificador inválido." },
+      { status: 400 },
+    );
+  }
+
+  const { supabase, user } = await authenticatedClient();
+
+  if (!user) {
+    return NextResponse.json(
+      { error: "Sessão não autenticada." },
+      { status: 401 },
+    );
+  }
+
+  const { data, error } = await supabase
+    .from("candidaturas")
+    .delete()
+    .eq("id", parsedId.data)
+    .eq("user_id", user.id)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    console.error("[applications:delete]", error);
+    return NextResponse.json(
+      { error: "Não foi possível excluir a candidatura." },
+      { status: 500 },
+    );
+  }
+
+  if (!data) {
+    return NextResponse.json(
+      { error: "Candidatura não encontrada." },
+      { status: 404 },
+    );
+  }
+
+  return new NextResponse(null, { status: 204 });
+}

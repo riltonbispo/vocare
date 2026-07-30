@@ -2,8 +2,23 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Briefcase01Icon } from "@hugeicons/core-free-icons";
+import {
+  Briefcase01Icon,
+  Delete01Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -21,7 +36,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { ConversionBanner } from "@/components/conversion-banner";
 import { useAnonymousSession } from "@/hooks/use-anonymous-session";
 import { createClient } from "@/lib/supabase/client";
@@ -37,6 +52,21 @@ const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
   dateStyle: "medium",
   timeStyle: "short",
 });
+
+async function deleteCandidatura(id: string) {
+  const response = await fetch(`/api/applications/${id}`, {
+    method: "DELETE",
+  });
+  const body = (await response.json().catch(() => null)) as {
+    error?: string;
+  } | null;
+
+  if (!response.ok) {
+    throw new Error(
+      body?.error ?? "Não foi possível excluir a candidatura.",
+    );
+  }
+}
 
 function HistorySkeleton() {
   return (
@@ -62,6 +92,9 @@ export default function HistoricoPage() {
   const [candidaturas, setCandidaturas] = useState<CandidaturaResumo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [candidaturaParaExcluir, setCandidaturaParaExcluir] =
+    useState<CandidaturaResumo | null>(null);
+  const [excluindo, setExcluindo] = useState(false);
 
   useEffect(() => {
     if (!session) {
@@ -98,6 +131,31 @@ export default function HistoricoPage() {
       active = false;
     };
   }, [session, sessionLoading]);
+
+  async function handleDelete() {
+    if (!candidaturaParaExcluir) return;
+
+    setExcluindo(true);
+
+    try {
+      await deleteCandidatura(candidaturaParaExcluir.id);
+      setCandidaturas((current) =>
+        current.filter(
+          (candidatura) => candidatura.id !== candidaturaParaExcluir.id,
+        ),
+      );
+      setCandidaturaParaExcluir(null);
+      toast.success("Candidatura excluída do histórico.");
+    } catch (deleteError) {
+      toast.error(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Não foi possível excluir a candidatura.",
+      );
+    } finally {
+      setExcluindo(false);
+    }
+  }
 
   const visibleError = error ?? sessionError;
 
@@ -142,39 +200,91 @@ export default function HistoricoPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {candidaturas.map((candidatura) => (
-            <Link
+            <Card
               key={candidatura.id}
-              href={`/historico/${candidatura.id}`}
-              className="rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-              aria-label={`Ver detalhes de ${
-                candidatura.vaga_titulo || "vaga sem título"
-              }`}
+              className="relative h-full transition-colors hover:bg-muted/40"
             >
-              <Card className="h-full transition-colors hover:bg-muted/40">
-                <CardHeader>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <CardTitle className="truncate">
-                        {candidatura.vaga_titulo || "Vaga sem título"}
-                      </CardTitle>
-                      <CardDescription className="mt-1 truncate">
-                        {candidatura.empresa || "Empresa não informada"}
-                      </CardDescription>
-                    </div>
+              <Link
+                href={`/historico/${candidatura.id}`}
+                className="absolute inset-0 rounded-2xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                aria-label={`Ver detalhes de ${
+                  candidatura.vaga_titulo || "vaga sem título"
+                }`}
+              />
+              <CardHeader className="pointer-events-none relative">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <CardTitle className="truncate">
+                      {candidatura.vaga_titulo || "Vaga sem título"}
+                    </CardTitle>
+                    <CardDescription className="mt-1 truncate">
+                      {candidatura.empresa || "Empresa não informada"}
+                    </CardDescription>
+                  </div>
+                  <div className="relative z-10 flex items-center gap-1">
                     <Badge variant="secondary">
                       {applicationStatusLabels[candidatura.status]}
                     </Badge>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="pointer-events-auto text-muted-foreground hover:text-destructive"
+                      aria-label={`Excluir candidatura ${
+                        candidatura.vaga_titulo || "sem título"
+                      }`}
+                      title="Excluir candidatura"
+                      onClick={() => setCandidaturaParaExcluir(candidatura)}
+                    >
+                      <HugeiconsIcon icon={Delete01Icon} />
+                    </Button>
                   </div>
-                </CardHeader>
-                <CardContent className="text-sm text-muted-foreground">
-                  Analisado em{" "}
-                  {dateFormatter.format(new Date(candidatura.created_at))}
-                </CardContent>
-              </Card>
-            </Link>
+                </div>
+              </CardHeader>
+              <CardContent className="pointer-events-none relative text-sm text-muted-foreground">
+                Analisado em{" "}
+                {dateFormatter.format(new Date(candidatura.created_at))}
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
+
+      <AlertDialog
+        open={Boolean(candidaturaParaExcluir)}
+        onOpenChange={(open) => {
+          if (!open && !excluindo) setCandidaturaParaExcluir(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogMedia className="bg-destructive/10 text-destructive">
+              <HugeiconsIcon icon={Delete01Icon} />
+            </AlertDialogMedia>
+            <AlertDialogTitle>Excluir candidatura?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A candidatura para{" "}
+              <strong>
+                {candidaturaParaExcluir?.vaga_titulo || "vaga sem título"}
+              </strong>{" "}
+              será removida permanentemente do histórico. Esta ação não pode
+              ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={excluindo}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={excluindo}
+              onClick={() => void handleDelete()}
+            >
+              {excluindo ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }
