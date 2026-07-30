@@ -84,6 +84,8 @@ ${originalCurriculumInstruction}
 - Não crie seções como "Highlights", "Compatibilidade com a vaga", "Resumo das alterações" ou similares.
 - Preserve um português natural, profissional e gramaticalmente correto.
 - Revise o texto para eliminar erros de concordância, construções artificiais, repetições, palavras com "(a)" e frases típicas de IA.
+- Preserve integralmente o conteúdo de seções como Certificações, Formação Acadêmica, Idiomas e outras seções não mencionadas explicitamente nestas instruções: não resuma, corte itens nem reduza bullets, mesmo que pareçam pouco relevantes para a vaga.
+- A reordenação e o resumo por relevância se aplicam apenas às seções de Competências (limite de 18 itens) e à apresentação das Experiências profissionais, conforme especificado acima.
 
 ### Formatação do currículo otimizado
 
