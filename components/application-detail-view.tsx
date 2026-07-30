@@ -33,6 +33,7 @@ import {
   parseOutreachEmail,
 } from "@/lib/email-utils";
 import { useAnonymousSession } from "@/hooks/use-anonymous-session";
+import { ApplicationChannelsField } from "@/components/application-channels-field";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -82,7 +83,7 @@ class ApiError extends Error {
 }
 
 type ApplicationResponse = { application: ApplicationDetail };
-type ApplicationQueryKey = readonly ["application", string];
+type ApplicationQueryKey = readonly ["application", string, string];
 type ApplicationUpdate = Partial<
   Pick<
     ApplicationDetail,
@@ -464,9 +465,11 @@ function EmailEditor({
 function ApplicationEditor({
   application,
   queryKey,
+  userId,
 }: {
   application: ApplicationDetail;
   queryKey: ApplicationQueryKey;
+  userId: string;
 }) {
   const [vagaTitulo, setVagaTitulo] = useState(
     application.vaga_titulo ?? "",
@@ -521,6 +524,10 @@ function ApplicationEditor({
             placeholder="Ex.: Acme"
           />
         </div>
+        <ApplicationChannelsField
+          applicationId={application.id}
+          userId={userId}
+        />
         <div className="grid gap-2">
           <Label htmlFor="application-status">Status</Label>
           <Select
@@ -563,11 +570,12 @@ function ApplicationEditor({
 export function ApplicationDetailView({ id }: { id: string }) {
   const { session, loading: sessionLoading, error: sessionError } =
     useAnonymousSession();
-  const queryKey = ["application", id] as const;
+  const userId = session?.user.id;
+  const queryKey = ["application", userId ?? "sem-sessao", id] as const;
   const query = useQuery({
     queryKey,
     queryFn: () => fetchApplication(id),
-    enabled: Boolean(session),
+    enabled: Boolean(userId),
     retry(failureCount, error) {
       return !(error instanceof ApiError && error.status < 500) &&
         failureCount < 1;
@@ -590,7 +598,7 @@ export function ApplicationDetailView({ id }: { id: string }) {
 
       {sessionLoading || (session && query.isPending) ? (
         <DetailSkeleton />
-      ) : visibleError || !application ? (
+      ) : visibleError || !application || !userId ? (
         <Alert variant="destructive">
           <AlertTitle>
             {query.error instanceof ApiError && query.error.status === 404
@@ -755,6 +763,7 @@ export function ApplicationDetailView({ id }: { id: string }) {
               key={application.updated_at}
               application={application}
               queryKey={queryKey}
+              userId={userId}
             />
           </div>
         </>

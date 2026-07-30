@@ -72,7 +72,7 @@ function ComboboxInput({
           <InputGroupButton
             size="icon-xs"
             variant="ghost"
-            render={<ComboboxTrigger />}
+            render={<ComboboxTrigger aria-label="Abrir opções" />}
             data-slot="input-group-button"
             className="group-has-data-[slot=combobox-clear]/input-group:hidden data-pressed:bg-transparent"
             disabled={disabled}
@@ -234,9 +234,11 @@ function ComboboxChip({
   className,
   children,
   showRemove = true,
+  removeAriaLabel = "Remover item",
   ...props
 }: ComboboxPrimitive.Chip.Props & {
   showRemove?: boolean
+  removeAriaLabel?: string
 }) {
   return (
     <ComboboxPrimitive.Chip
@@ -253,6 +255,7 @@ function ComboboxChip({
           render={<Button variant="ghost" size="icon-xs" />}
           className="-ml-1 opacity-50 hover:opacity-100"
           data-slot="combobox-chip-remove"
+          aria-label={removeAriaLabel}
         >
           <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="pointer-events-none" />
         </ComboboxPrimitive.ChipRemove>
