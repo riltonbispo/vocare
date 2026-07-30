@@ -16,6 +16,10 @@ Aplicação web para adaptar currículos a vagas específicas com IA. O usuário
 - Histórico de candidaturas protegido por Row Level Security (RLS).
 - Conversão da sessão anônima em conta permanente sem alterar o `user_id`.
 - Identificação automática do título da vaga e da empresa quando esses campos não forem preenchidos.
+- Catálogo reutilizável de canais de candidatura por usuário, com seleção de
+  múltiplas tags e criação de novos canais no detalhe da candidatura.
+- Badges de canais nos cartões do histórico e filtro com a opção
+  **Todos os canais**.
 
 ## Stack
 
@@ -84,6 +88,23 @@ O arquivo `supabase/config.toml` configura o ambiente local com:
 - `enable_manual_linking = true`;
 - limite de 10 usuários anônimos por IP/hora;
 - confirmação obrigatória de e-mail.
+
+A migration de canais adiciona duas tabelas:
+
+- `application_channels`: catálogo de canais pertencentes ao usuário;
+- `application_channel_assignments`: relacionamento muitos-para-muitos entre
+  canais e candidaturas.
+
+Os nomes têm os espaços normalizados e são deduplicados por usuário sem
+considerar diferenças de maiúsculas, espaços extras e acentuação. O nome
+amigável informado pelo usuário, como `WhatsApp`, continua sendo usado na
+interface.
+
+As duas tabelas usam RLS. Usuários autenticados, inclusive sessões anônimas
+criadas pelo Supabase Auth, somente podem consultar e alterar os próprios
+canais e relacionamentos. As constraints do relacionamento também impedem
+associar um canal a uma candidatura de outro usuário. Remover uma associação
+não apaga o canal do catálogo reutilizável.
 
 Para aplicar a migration localmente:
 
@@ -161,6 +182,10 @@ Executa o ESLint no projeto.
 4. Revise o currículo otimizado.
 5. Baixe o resultado em Markdown ou PDF.
 6. Revise o e-mail gerado e abra no Gmail ou no cliente de e-mail padrão.
+7. No detalhe da candidatura, selecione canais existentes ou digite um novo
+   canal e pressione `Enter` para criá-lo e associá-lo.
+8. Em `/historico`, consulte os canais nos badges dos cartões ou filtre as
+   candidaturas por um canal específico.
 
 ## Variáveis de Ambiente
 
@@ -179,12 +204,26 @@ Executa o ESLint no projeto.
 | `/` | `GET` | Interface principal da aplicação. |
 | `/api/analyze` | `POST` | Recebe descrição da vaga e currículo, faz uma análise estruturada com Gemini e retorna currículo/e-mail gerados. |
 | `/api/pdf` | `POST` | Recebe Markdown e retorna um PDF renderizado. |
+| `/api/application-channels` | `GET`, `POST` | Lista os canais reutilizáveis da sessão atual ou cria um novo canal. |
 | `/api/applications/[id]` | `GET`, `PATCH`, `DELETE` | Consulta, atualiza ou exclui uma candidatura da sessão atual. |
+| `/api/applications/[id]/channels` | `GET`, `POST`, `DELETE` | Lista, associa ou remove canais da candidatura, após validar a sessão e a propriedade dos recursos. |
 | `/historico` | `GET` | Lista as candidaturas da sessão atual via RLS. |
 | `/historico/[id]` | `GET` | Exibe materiais, resultado e acompanhamento de uma candidatura. |
 | `/conta` | `GET` | Converte a sessão anônima ou entra em uma conta existente. |
 | `/conta/confirmar` | `GET` | Define a senha depois da confirmação do e-mail. |
 | `/auth/callback` | `GET` | Troca o código de confirmação por uma sessão Supabase. |
+
+## Modelo de dados dos canais
+
+| Tabela | Finalidade |
+| --- | --- |
+| `application_channels` | Mantém o catálogo reutilizável do usuário, o nome amigável e sua chave normalizada para deduplicação. |
+| `application_channel_assignments` | Associa vários canais a várias candidaturas sem transferir a propriedade entre usuários. |
+
+As exclusões usam `ON DELETE CASCADE` para limpar relacionamentos quando uma
+candidatura, um canal ou o usuário proprietário é removido. Excluir somente
+uma linha de `application_channel_assignments` mantém o canal disponível para
+outras candidaturas.
 
 ## Entrada de Arquivos
 
@@ -211,13 +250,16 @@ app/
   auth/callback/route.ts # confirmação de identidade Supabase
   api/
     analyze/route.ts  # entrada, resposta HTTP e persistência da análise
+    application-channels/route.ts # catálogo reutilizável de canais
     applications/[id]/route.ts # consulta, edição e exclusão de candidatura
+    applications/[id]/channels/route.ts # associações de canais
     pdf/route.ts      # geração de PDF a partir de Markdown
   conta/              # conversão da conta anônima e definição de senha
   historico/          # listagem e detalhe protegidos por RLS
   page.tsx            # tela principal
 components/
   analysis-results.tsx
+  application-channels-field.tsx
   application-detail-view.tsx
   conversion-banner.tsx
   query-provider.tsx
@@ -226,6 +268,7 @@ components/
 hooks/
   use-anonymous-session.ts
 lib/
+  application-channels.ts # tipos, limite e normalização dos nomes de canais
   email-utils.ts
   gemini/analyze.ts    # chamada estruturada única, retry e validação
   pdf-template.ts
@@ -235,6 +278,7 @@ lib/
 supabase/
   config.toml
   migrations/
+    20260730000000_application_channels.sql
 ```
 
 ## Observações
@@ -247,6 +291,8 @@ supabase/
   novas tentativas automáticas com backoff.
 - O e-mail gerado deve assinar com os dados encontrados no currículo do candidato; dados ausentes são omitidos.
 - O `insert` no histórico usa a sessão da própria requisição e respeita RLS. Uma falha ao salvar é registrada no servidor, mas não invalida a análise Gemini.
+- Os canais são salvos no catálogo do usuário e podem ser reutilizados em
+  outras candidaturas. Remover um badge no detalhe exclui apenas a associação.
 - Entrar em uma conta já existente não mescla candidaturas da sessão anônima. A interface avisa sobre essa perda de vínculo e o código contém um `TODO` para a futura regra de negócio.
 
 ## Roteiro manual: anônimo → conta permanente
