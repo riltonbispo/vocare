@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Mail01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { toast } from "sonner";
 import { buildGmailComposeUrl, buildMailtoUrl } from "@/lib/email-utils";
 import { triggerBlobDownload } from "@/lib/browser/download";
 
@@ -27,6 +28,7 @@ export function AnalysisResults({
   recruiterEmail: string | null;
 }) {
   const [copied, setCopied] = useState<"curriculum" | "email" | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [to, setTo] = useState(recruiterEmail ?? "");
 
   async function copy(text: string, which: "curriculum" | "email") {
@@ -50,18 +52,39 @@ export function AnalysisResults({
   }
 
   async function downloadPdf() {
-    const res = await fetch("/api/pdf", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        markdown: curriculum,
-        filename: "curriculo-otimizado",
-      }),
-    });
+    setDownloadingPdf(true);
 
-    if (!res.ok) return;
+    try {
+      const response = await fetch("/api/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          markdown: curriculum,
+          filename: "curriculo-otimizado",
+        }),
+      });
 
-    triggerBlobDownload(await res.blob(), "curriculo-otimizado.pdf");
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(body?.error ?? "Não foi possível gerar o PDF.");
+      }
+
+      triggerBlobDownload(
+        await response.blob(),
+        "curriculo-otimizado.pdf",
+      );
+      toast.success("PDF gerado para download.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível gerar o PDF.",
+      );
+    } finally {
+      setDownloadingPdf(false);
+    }
   }
 
   return (
@@ -121,8 +144,12 @@ export function AnalysisResults({
                 >
                   Baixar Markdown
                 </Button>
-                <Button variant="outline" onClick={downloadPdf}>
-                  Baixar PDF
+                <Button
+                  variant="outline"
+                  onClick={() => void downloadPdf()}
+                  disabled={downloadingPdf}
+                >
+                  {downloadingPdf ? "Gerando PDF..." : "Baixar PDF"}
                 </Button>
               </CardContent>
             </Card>

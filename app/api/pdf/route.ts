@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildResumeHtml } from "@/lib/pdf-template";
 
+export const runtime = "nodejs";
+export const maxDuration = 30;
+
 export async function POST(req: NextRequest) {
+  let browser: import("puppeteer-core").Browser | undefined;
+
   try {
     const { markdown, filename = "curriculo" } = await req.json();
 
@@ -15,8 +20,6 @@ export async function POST(req: NextRequest) {
     const html = buildResumeHtml(markdown);
     const isLocal = process.env.NODE_ENV === "development";
 
-    let browser;
-
     if (isLocal) {
       // Dev: usa o puppeteer completo (Chromium próprio baixado localmente)
       const puppeteer = await import("puppeteer");
@@ -27,9 +30,12 @@ export async function POST(req: NextRequest) {
       const chromium = (await import("@sparticuz/chromium")).default;
 
       browser = await puppeteer.launch({
-        args: chromium.args,
+        args: await puppeteer.defaultArgs({
+          args: chromium.args,
+          headless: "shell",
+        }),
         executablePath: await chromium.executablePath(),
-        headless: true,
+        headless: "shell",
       });
     }
 
@@ -44,8 +50,6 @@ export async function POST(req: NextRequest) {
       })
     );
 
-    await browser.close();
-
     return new NextResponse(pdfBuffer, {
       headers: {
         "Content-Type": "application/pdf",
@@ -58,5 +62,11 @@ export async function POST(req: NextRequest) {
       { error: "Falha ao gerar PDF." },
       { status: 500 }
     );
+  } finally {
+    if (browser) {
+      await browser.close().catch((error) => {
+        console.error("Falha ao fechar o navegador do gerador de PDF.", error);
+      });
+    }
   }
 }
