@@ -16,6 +16,72 @@ export type ApplicationStatus =
 export type Database = {
   public: {
     Tables: {
+      application_channel_assignments: {
+        Row: {
+          application_id: string;
+          channel_id: string;
+          created_at: string;
+          id: string;
+          user_id: string;
+        };
+        Insert: {
+          application_id: string;
+          channel_id: string;
+          created_at?: string;
+          id?: string;
+          user_id: string;
+        };
+        Update: {
+          application_id?: string;
+          channel_id?: string;
+          created_at?: string;
+          id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "application_channel_assignments_application_owner_fkey";
+            columns: ["application_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "candidaturas";
+            referencedColumns: ["id", "user_id"];
+          },
+          {
+            foreignKeyName: "application_channel_assignments_channel_owner_fkey";
+            columns: ["channel_id", "user_id"];
+            isOneToOne: false;
+            referencedRelation: "application_channels";
+            referencedColumns: ["id", "user_id"];
+          },
+        ];
+      };
+      application_channels: {
+        Row: {
+          created_at: string;
+          id: string;
+          name: string;
+          normalized_name: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          name: string;
+          normalized_name?: never;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          name?: string;
+          normalized_name?: never;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       candidaturas: {
         Row: {
           id: string;
@@ -72,10 +138,23 @@ export type Database = {
       };
     };
     Views: Record<never, never>;
-    Functions: Record<never, never>;
+    Functions: {
+      canonicalize_application_channel_name: {
+        Args: { value: string };
+        Returns: string;
+      };
+      normalize_application_channel_name: {
+        Args: { value: string };
+        Returns: string;
+      };
+    };
     Enums: Record<never, never>;
     CompositeTypes: Record<never, never>;
   };
 };
 
 export type Candidatura = Database["public"]["Tables"]["candidaturas"]["Row"];
+export type ApplicationChannelRow =
+  Database["public"]["Tables"]["application_channels"]["Row"];
+export type ApplicationChannelAssignment =
+  Database["public"]["Tables"]["application_channel_assignments"]["Row"];
