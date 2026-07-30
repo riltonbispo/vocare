@@ -9,6 +9,12 @@ import Link from "next/link";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
+import {
+  Download01Icon,
+  Mail01Icon,
+  SaveIcon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 
 import {
   APPLICATION_STATUSES,
@@ -19,6 +25,13 @@ import type {
   ApplicationStatus,
   Json,
 } from "@/lib/supabase/database.types";
+import { triggerBlobDownload } from "@/lib/browser/download";
+import {
+  buildGmailComposeUrl,
+  extractEmailFromText,
+  formatOutreachEmail,
+  parseOutreachEmail,
+} from "@/lib/email-utils";
 import { useAnonymousSession } from "@/hooks/use-anonymous-session";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +43,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Progress,
@@ -68,10 +82,18 @@ class ApiError extends Error {
 }
 
 type ApplicationResponse = { application: ApplicationDetail };
-type ApplicationUpdate = {
-  status: ApplicationStatus;
-  notas: string | null;
-};
+type ApplicationQueryKey = readonly ["application", string];
+type ApplicationUpdate = Partial<
+  Pick<
+    ApplicationDetail,
+    | "vaga_titulo"
+    | "empresa"
+    | "curriculo_otimizado"
+    | "email_outreach"
+    | "status"
+    | "notas"
+  >
+>;
 
 async function parseResponse(response: Response): Promise<ApplicationResponse> {
   const body = (await response.json().catch(() => null)) as {
@@ -103,6 +125,54 @@ async function updateApplication(id: string, update: ApplicationUpdate) {
     body: JSON.stringify(update),
   });
   return parseResponse(response);
+}
+
+function useApplicationUpdate(
+  id: string,
+  queryKey: ApplicationQueryKey,
+  successMessage: string,
+) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (update: ApplicationUpdate) =>
+      updateApplication(id, update),
+    async onMutate(update) {
+      await queryClient.cancelQueries({ queryKey });
+      const previous =
+        queryClient.getQueryData<ApplicationResponse>(queryKey);
+
+      queryClient.setQueryData<ApplicationResponse>(queryKey, (current) =>
+        current
+          ? {
+              application: {
+                ...current.application,
+                ...update,
+              },
+            }
+          : current,
+      );
+
+      return { previous };
+    },
+    onError(error, _update, context) {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKey, context.previous);
+      }
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível salvar as alterações.",
+      );
+    },
+    onSuccess(data) {
+      queryClient.setQueryData(queryKey, data);
+      toast.success(successMessage);
+    },
+    onSettled() {
+      void queryClient.invalidateQueries({ queryKey });
+    },
+  });
 }
 
 function EmptySection({ children }: { children: string }) {
@@ -167,60 +237,255 @@ function DetailSkeleton() {
   );
 }
 
+function CurriculumEditor({
+  application,
+  queryKey,
+}: {
+  application: ApplicationDetail;
+  queryKey: ApplicationQueryKey;
+}) {
+  const [curriculum, setCurriculum] = useState(
+    application.curriculo_otimizado ?? "",
+  );
+  const [downloading, setDownloading] = useState(false);
+  const mutation = useApplicationUpdate(
+    application.id,
+    queryKey,
+    "Currículo atualizado.",
+  );
+
+  function save() {
+    mutation.mutate({
+      curriculo_otimizado: curriculum.trim() || null,
+    });
+  }
+
+  async function downloadPdf() {
+    if (!curriculum.trim()) return;
+
+    setDownloading(true);
+
+    try {
+      const response = await fetch("/api/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          markdown: curriculum,
+          filename: "curriculo-otimizado",
+        }),
+      });
+
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(body?.error ?? "Não foi possível gerar o PDF.");
+      }
+
+      triggerBlobDownload(
+        await response.blob(),
+        "curriculo-otimizado.pdf",
+      );
+      toast.success("PDF gerado para download.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível gerar o PDF.",
+      );
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Editar currículo otimizado</CardTitle>
+          <CardDescription>
+            Altere o Markdown e salve a nova versão desta candidatura.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          <Label htmlFor="optimized-curriculum">Conteúdo em Markdown</Label>
+          <Textarea
+            id="optimized-curriculum"
+            value={curriculum}
+            onChange={(event) => setCurriculum(event.target.value)}
+            maxLength={500_000}
+            placeholder="Edite ou insira o currículo otimizado..."
+            className="min-h-[32rem] font-mono text-sm"
+          />
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              onClick={save}
+              disabled={mutation.isPending}
+              className="gap-2"
+            >
+              <HugeiconsIcon icon={SaveIcon} />
+              {mutation.isPending ? "Salvando..." : "Salvar currículo"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => void downloadPdf()}
+              disabled={downloading || !curriculum.trim()}
+              className="gap-2"
+            >
+              <HugeiconsIcon icon={Download01Icon} />
+              {downloading ? "Gerando PDF..." : "Baixar PDF"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Pré-visualização</CardTitle>
+          <CardDescription>
+            Visualização da versão atualmente no editor.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {curriculum.trim() ? (
+            <article className="prose max-w-none dark:prose-invert">
+              <ReactMarkdown>{curriculum}</ReactMarkdown>
+            </article>
+          ) : (
+            <EmptySection>
+              Insira o currículo otimizado para visualizá-lo.
+            </EmptySection>
+          )}
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+
+function EmailEditor({
+  application,
+  queryKey,
+}: {
+  application: ApplicationDetail;
+  queryKey: ApplicationQueryKey;
+}) {
+  const initialEmail = parseOutreachEmail(
+    application.email_outreach ?? "",
+  );
+  const [to, setTo] = useState(
+    extractEmailFromText(application.descricao_vaga ?? "") ?? "",
+  );
+  const [subject, setSubject] = useState(initialEmail.subject);
+  const [body, setBody] = useState(initialEmail.body);
+  const mutation = useApplicationUpdate(
+    application.id,
+    queryKey,
+    "Email atualizado.",
+  );
+
+  function save() {
+    mutation.mutate({
+      email_outreach: formatOutreachEmail({ subject, body }) || null,
+    });
+  }
+
+  function openGmail() {
+    const url = buildGmailComposeUrl({ to: to.trim(), subject, body });
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Editar email de candidatura</CardTitle>
+        <CardDescription>
+          Revise a mensagem, salve as alterações ou continue no Gmail.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-5">
+        <div className="grid gap-2">
+          <Label htmlFor="email-recipient">Destinatário</Label>
+          <Input
+            id="email-recipient"
+            type="email"
+            value={to}
+            onChange={(event) => setTo(event.target.value)}
+            autoComplete="email"
+            placeholder="recrutamento@empresa.com"
+          />
+          <p className="text-xs text-muted-foreground">
+            Usado ao abrir o Gmail; não é salvo na candidatura.
+          </p>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="email-subject">Assunto</Label>
+          <Input
+            id="email-subject"
+            value={subject}
+            onChange={(event) => setSubject(event.target.value)}
+            maxLength={500}
+            placeholder="Assunto do email"
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="email-body">Mensagem</Label>
+          <Textarea
+            id="email-body"
+            value={body}
+            onChange={(event) => setBody(event.target.value)}
+            maxLength={99_000}
+            placeholder="Escreva a mensagem de candidatura..."
+            className="min-h-80"
+          />
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button
+            onClick={save}
+            disabled={mutation.isPending}
+            className="gap-2"
+          >
+            <HugeiconsIcon icon={SaveIcon} />
+            {mutation.isPending ? "Salvando..." : "Salvar email"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={openGmail}
+            className="gap-2"
+          >
+            <HugeiconsIcon icon={Mail01Icon} />
+            Abrir no Gmail
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function ApplicationEditor({
   application,
   queryKey,
 }: {
   application: ApplicationDetail;
-  queryKey: readonly ["application", string];
+  queryKey: ApplicationQueryKey;
 }) {
-  const queryClient = useQueryClient();
+  const [vagaTitulo, setVagaTitulo] = useState(
+    application.vaga_titulo ?? "",
+  );
+  const [empresa, setEmpresa] = useState(application.empresa ?? "");
   const [status, setStatus] = useState<ApplicationStatus>(
     application.status,
   );
   const [notas, setNotas] = useState(application.notas ?? "");
-  const mutation = useMutation({
-    mutationFn: (update: ApplicationUpdate) =>
-      updateApplication(application.id, update),
-    async onMutate(update) {
-      await queryClient.cancelQueries({ queryKey });
-      const previous =
-        queryClient.getQueryData<ApplicationResponse>(queryKey);
-
-      queryClient.setQueryData<ApplicationResponse>(queryKey, (current) =>
-        current
-          ? {
-              application: {
-                ...current.application,
-                ...update,
-              },
-            }
-          : current,
-      );
-
-      return { previous };
-    },
-    onError(error, _update, context) {
-      if (context?.previous) {
-        queryClient.setQueryData(queryKey, context.previous);
-      }
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Não foi possível salvar as alterações.",
-      );
-    },
-    onSuccess(data) {
-      queryClient.setQueryData(queryKey, data);
-      toast.success("Candidatura atualizada.");
-    },
-    onSettled() {
-      void queryClient.invalidateQueries({ queryKey });
-    },
-  });
+  const mutation = useApplicationUpdate(
+    application.id,
+    queryKey,
+    "Candidatura atualizada.",
+  );
 
   function save() {
     mutation.mutate({
+      vaga_titulo: vagaTitulo.trim() || null,
+      empresa: empresa.trim() || null,
       status,
       notas: notas.trim() || null,
     });
@@ -235,6 +500,27 @@ function ApplicationEditor({
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-5">
+        <div className="grid gap-2">
+          <Label htmlFor="application-title">Título da vaga</Label>
+          <Input
+            id="application-title"
+            value={vagaTitulo}
+            onChange={(event) => setVagaTitulo(event.target.value)}
+            maxLength={200}
+            placeholder="Ex.: Desenvolvedor Front-end"
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="application-company">Empresa</Label>
+          <Input
+            id="application-company"
+            value={empresa}
+            onChange={(event) => setEmpresa(event.target.value)}
+            maxLength={200}
+            autoComplete="organization"
+            placeholder="Ex.: Acme"
+          />
+        </div>
         <div className="grid gap-2">
           <Label htmlFor="application-status">Status</Label>
           <Select
@@ -412,27 +698,10 @@ export function ApplicationDetailView({ id }: { id: string }) {
                       )}
                     </CardContent>
                   </Card>
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Currículo otimizado</CardTitle>
-                      <CardDescription>
-                        Versão gerada para esta oportunidade.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {application.curriculo_otimizado ? (
-                        <article className="prose max-w-none dark:prose-invert">
-                          <ReactMarkdown>
-                            {application.curriculo_otimizado}
-                          </ReactMarkdown>
-                        </article>
-                      ) : (
-                        <EmptySection>
-                          Nenhuma versão otimizada foi salva.
-                        </EmptySection>
-                      )}
-                    </CardContent>
-                  </Card>
+                  <CurriculumEditor
+                    application={application}
+                    queryKey={queryKey}
+                  />
                 </div>
               </TabsContent>
 
@@ -475,25 +744,10 @@ export function ApplicationDetailView({ id }: { id: string }) {
               </TabsContent>
 
               <TabsContent value="email">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Email de outreach</CardTitle>
-                    <CardDescription>
-                      Mensagem gerada para contato com recrutamento.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {application.email_outreach ? (
-                      <div className="whitespace-pre-wrap leading-7">
-                        {application.email_outreach}
-                      </div>
-                    ) : (
-                      <EmptySection>
-                        Nenhum email foi gerado para esta candidatura.
-                      </EmptySection>
-                    )}
-                  </CardContent>
-                </Card>
+                <EmailEditor
+                  application={application}
+                  queryKey={queryKey}
+                />
               </TabsContent>
             </Tabs>
 

@@ -12,12 +12,29 @@ const statusValues = APPLICATION_STATUSES.map(({ value }) => value) as [
 ];
 const updateSchema = z
   .object({
+    vaga_titulo: z.string().max(200).nullable().optional(),
+    empresa: z.string().max(200).nullable().optional(),
+    curriculo_otimizado: z.string().max(500_000).nullable().optional(),
+    email_outreach: z.string().max(100_000).nullable().optional(),
     status: z.enum(statusValues).optional(),
     notas: z.string().max(10_000).nullable().optional(),
   })
   .strict()
   .refine(
-    ({ status, notas }) => status !== undefined || notas !== undefined,
+    ({
+      vaga_titulo,
+      empresa,
+      curriculo_otimizado,
+      email_outreach,
+      status,
+      notas,
+    }) =>
+      vaga_titulo !== undefined ||
+      empresa !== undefined ||
+      curriculo_otimizado !== undefined ||
+      email_outreach !== undefined ||
+      status !== undefined ||
+      notas !== undefined,
     "Informe ao menos um campo para atualizar.",
   );
 
@@ -122,6 +139,19 @@ export async function PATCH(
   }
 
   const update = {
+    ...(parsedBody.data.vaga_titulo !== undefined && {
+      vaga_titulo: parsedBody.data.vaga_titulo?.trim() || null,
+    }),
+    ...(parsedBody.data.empresa !== undefined && {
+      empresa: parsedBody.data.empresa?.trim() || null,
+    }),
+    ...(parsedBody.data.curriculo_otimizado !== undefined && {
+      curriculo_otimizado:
+        parsedBody.data.curriculo_otimizado?.trim() || null,
+    }),
+    ...(parsedBody.data.email_outreach !== undefined && {
+      email_outreach: parsedBody.data.email_outreach?.trim() || null,
+    }),
     ...(parsedBody.data.status !== undefined && {
       status: parsedBody.data.status,
     }),

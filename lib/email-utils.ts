@@ -3,6 +3,37 @@ export function extractEmailFromText(text: string): string | null {
   return match ? match[0] : null;
 }
 
+export function parseOutreachEmail(text: string) {
+  const match = text.match(
+    /^\s*Assunto:\s*([^\r\n]*)(?:(?:\r?\n){1,2}([\s\S]*))?$/i,
+  );
+
+  if (!match) {
+    return { subject: "", body: text.trim() };
+  }
+
+  return {
+    subject: match[1]?.trim() ?? "",
+    body: match[2]?.trim() ?? "",
+  };
+}
+
+export function formatOutreachEmail({
+  subject,
+  body,
+}: {
+  subject: string;
+  body: string;
+}) {
+  const normalizedSubject = subject.trim();
+  const normalizedBody = body.trim();
+
+  if (!normalizedSubject) return normalizedBody;
+  if (!normalizedBody) return `Assunto: ${normalizedSubject}`;
+
+  return `Assunto: ${normalizedSubject}\n\n${normalizedBody}`;
+}
+
 export function buildGmailComposeUrl({
   to,
   subject,
