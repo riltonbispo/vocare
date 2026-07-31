@@ -409,16 +409,19 @@ export default function HistoricoPage() {
                 }`}
               />
               <CardHeader className="pointer-events-none relative">
-                <div className="flex items-start justify-between gap-3">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
                   <div className="min-w-0">
-                    <CardTitle className="truncate">
+                    <CardTitle
+                      className="truncate"
+                      title={candidatura.vaga_titulo || "Vaga sem título"}
+                    >
                       {candidatura.vaga_titulo || "Vaga sem título"}
                     </CardTitle>
                     <CardDescription className="mt-1 truncate">
                       {candidatura.empresa || "Empresa não informada"}
                     </CardDescription>
                   </div>
-                  <div className="relative z-10 flex items-center gap-1">
+                  <div className="relative z-10 flex shrink-0 items-center gap-1">
                     <Badge variant="secondary">
                       {applicationStatusLabels[candidatura.status]}
                     </Badge>
