@@ -590,10 +590,10 @@ export function ApplicationDetailView({ id }: { id: string }) {
   return (
     <main className="container mx-auto max-w-7xl px-6 py-10">
       <Link
-        href="/historico"
+        href="/candidaturas"
         className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "mb-4")}
       >
-        ← Voltar ao histórico
+        ← Voltar às candidaturas
       </Link>
 
       {sessionLoading || (session && query.isPending) ? (

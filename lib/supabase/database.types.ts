@@ -13,6 +13,10 @@ export type ApplicationStatus =
   | "rejeitado"
   | "arquivado";
 
+export type AnalysisStatus = "pending" | "completed" | "failed";
+
+export type CurriculumInputKind = "text" | "pdf";
+
 export type Database = {
   public: {
     Tables: {
@@ -84,6 +88,7 @@ export type Database = {
       };
       candidaturas: {
         Row: {
+          analysis_status: AnalysisStatus;
           id: string;
           user_id: string;
           vaga_titulo: string | null;
@@ -91,16 +96,23 @@ export type Database = {
           descricao_vaga: string | null;
           curriculo_original: string | null;
           curriculo_original_url: string | null;
+          curriculo_input_kind: CurriculumInputKind | null;
+          curriculo_arquivo_path: string | null;
+          curriculo_arquivo_nome: string | null;
           curriculo_otimizado: string | null;
           email_outreach: string | null;
+          error_code: string | null;
+          last_error: string | null;
           match_score: number | null;
           gap_analysis: Json | null;
           notas: string | null;
+          retry_count: number;
           status: ApplicationStatus;
           created_at: string;
           updated_at: string;
         };
         Insert: {
+          analysis_status?: AnalysisStatus;
           id?: string;
           user_id: string;
           vaga_titulo?: string | null;
@@ -108,16 +120,23 @@ export type Database = {
           descricao_vaga?: string | null;
           curriculo_original?: string | null;
           curriculo_original_url?: string | null;
+          curriculo_input_kind?: CurriculumInputKind | null;
+          curriculo_arquivo_path?: string | null;
+          curriculo_arquivo_nome?: string | null;
           curriculo_otimizado?: string | null;
           email_outreach?: string | null;
+          error_code?: string | null;
+          last_error?: string | null;
           match_score?: number | null;
           gap_analysis?: Json | null;
           notas?: string | null;
+          retry_count?: number;
           status?: ApplicationStatus;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
+          analysis_status?: AnalysisStatus;
           id?: string;
           user_id?: string;
           vaga_titulo?: string | null;
@@ -125,11 +144,17 @@ export type Database = {
           descricao_vaga?: string | null;
           curriculo_original?: string | null;
           curriculo_original_url?: string | null;
+          curriculo_input_kind?: CurriculumInputKind | null;
+          curriculo_arquivo_path?: string | null;
+          curriculo_arquivo_nome?: string | null;
           curriculo_otimizado?: string | null;
           email_outreach?: string | null;
+          error_code?: string | null;
+          last_error?: string | null;
           match_score?: number | null;
           gap_analysis?: Json | null;
           notas?: string | null;
+          retry_count?: number;
           status?: ApplicationStatus;
           created_at?: string;
           updated_at?: string;

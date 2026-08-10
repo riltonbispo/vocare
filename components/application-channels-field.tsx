@@ -49,16 +49,6 @@ type AssociationVariables = {
   created?: boolean;
 };
 
-type ApplicationHistoryCache = {
-  applications: Array<
-    {
-      id: string;
-      channels: ApplicationChannel[];
-    } & Record<string, unknown>
-  >;
-  channels: ApplicationChannel[];
-};
-
 const EMPTY_CHANNELS: ApplicationChannel[] = [];
 
 function catalogQueryKey(userId: string) {
@@ -227,30 +217,6 @@ function mergeChannel(
   return sortChannels([...withoutCurrent, channel]);
 }
 
-function updateHistoryCache(
-  current: ApplicationHistoryCache | undefined,
-  applicationId: string,
-  applicationChannels: ApplicationChannel[],
-  catalogChannel?: ApplicationChannel,
-) {
-  if (!current) return current;
-
-  return {
-    ...current,
-    channels: catalogChannel
-      ? mergeChannel(current.channels, catalogChannel)
-      : current.channels,
-    applications: current.applications.map((application) =>
-      application.id === applicationId
-        ? {
-            ...application,
-            channels: sortChannels(applicationChannels),
-          }
-        : application,
-    ),
-  };
-}
-
 function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
 }
@@ -269,7 +235,6 @@ export function ApplicationChannelsField({
   const queryClient = useQueryClient();
   const catalogKey = catalogQueryKey(userId);
   const selectedKey = applicationChannelsQueryKey(userId, applicationId);
-  const historyKey = ["application-history", userId] as const;
   const [inputValue, setInputValue] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
   const highlightedItemRef = useRef<ChannelOption | undefined>(undefined);
@@ -314,14 +279,9 @@ export function ApplicationChannelsField({
     mutationFn: (variables: AssociationVariables) =>
       updateChannelAssociation(applicationId, variables),
     async onMutate(variables) {
-      await Promise.all([
-        queryClient.cancelQueries({ queryKey: selectedKey, exact: true }),
-        queryClient.cancelQueries({ queryKey: historyKey, exact: true }),
-      ]);
+      await queryClient.cancelQueries({ queryKey: selectedKey, exact: true });
       const previousSelected =
         queryClient.getQueryData<ApplicationChannel[]>(selectedKey);
-      const previousHistory =
-        queryClient.getQueryData<ApplicationHistoryCache>(historyKey);
       const optimisticSelected =
         variables.action === "associate"
           ? mergeChannel(previousSelected, variables.channel)
@@ -333,23 +293,12 @@ export function ApplicationChannelsField({
         selectedKey,
         optimisticSelected,
       );
-      queryClient.setQueryData<ApplicationHistoryCache>(
-        historyKey,
-        (current) =>
-          updateHistoryCache(
-            current,
-            applicationId,
-            optimisticSelected,
-            variables.action === "associate" ? variables.channel : undefined,
-          ),
-      );
 
-      return { previousHistory, previousSelected };
+      return { previousSelected };
     },
     onError(error, variables, context) {
       if (context) {
         queryClient.setQueryData(selectedKey, context.previousSelected);
-        queryClient.setQueryData(historyKey, context.previousHistory);
       }
 
       toast.error(
@@ -371,16 +320,6 @@ export function ApplicationChannelsField({
           : currentSelected;
 
       queryClient.setQueryData(selectedKey, canonicalSelected);
-      queryClient.setQueryData<ApplicationHistoryCache>(
-        historyKey,
-        (current) =>
-          updateHistoryCache(
-            current,
-            applicationId,
-            canonicalSelected,
-            result.action === "associate" ? result.channel : undefined,
-          ),
-      );
 
       if (variables.action === "remove") {
         toast.success("Canal removido da candidatura.");
@@ -400,11 +339,6 @@ export function ApplicationChannelsField({
       void queryClient.invalidateQueries({
         queryKey: selectedKey,
         exact: true,
-      });
-      void queryClient.invalidateQueries({
-        queryKey: historyKey,
-        exact: true,
-        refetchType: "all",
       });
     },
   });
@@ -436,21 +370,6 @@ export function ApplicationChannelsField({
         EMPTY_CHANNELS;
 
       if (currentSelected.some((channel) => channel.id === result.channel.id)) {
-        queryClient.setQueryData<ApplicationHistoryCache>(
-          historyKey,
-          (current) =>
-            updateHistoryCache(
-              current,
-              applicationId,
-              currentSelected,
-              result.channel,
-            ),
-        );
-        void queryClient.invalidateQueries({
-          queryKey: historyKey,
-          exact: true,
-          refetchType: "all",
-        });
         toast.success("O canal já estava associado à candidatura.");
         return;
       }
