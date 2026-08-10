@@ -161,7 +161,7 @@ export function AnalysisFlow() {
         <p className="max-w-2xl text-muted-foreground">
           Cole a descrição da vaga e envie seu currículo em PDF ou Markdown. A
           IA irá adaptar seu currículo mantendo sua experiência verdadeira e
-          aumentar sua aderência à vaga.
+          destacar os pontos mais relevantes para a vaga.
         </p>
       </div>
 

@@ -17,25 +17,16 @@ export type UserApplication = Pick<
   | "id"
   | "vaga_titulo"
   | "empresa"
-  | "match_score"
   | "status"
   | "analysis_status"
   | "created_at"
   | "updated_at"
 >;
 
-export type MatchFilter =
-  | "all"
-  | "good"
-  | "medium"
-  | "weak"
-  | "unscored";
-
 export type AnalysisStatusFilter = AnalysisStatus | "all";
 
 export type UseUserApplicationsOptions = {
   pageSize?: number;
-  matchFilter?: MatchFilter;
   analysisStatus?: AnalysisStatusFilter;
 };
 
@@ -53,7 +44,6 @@ export type UserApplicationsPage = {
 
 type NormalizedUserApplicationsOptions = {
   pageSize: number;
-  matchFilter: MatchFilter;
   analysisStatus: AnalysisStatusFilter;
 };
 
@@ -71,7 +61,7 @@ export const userApplicationsKeys = {
 };
 
 const USER_APPLICATIONS_SELECT =
-  "id, vaga_titulo, empresa, match_score, status, analysis_status, created_at, updated_at" as const;
+  "id, vaga_titulo, empresa, status, analysis_status, created_at, updated_at" as const;
 
 function normalizePageSize(pageSize: number | undefined) {
   if (pageSize === undefined || !Number.isFinite(pageSize)) {
@@ -97,7 +87,6 @@ function normalizeOptions(
 ): NormalizedUserApplicationsOptions {
   return {
     pageSize: normalizePageSize(options.pageSize),
-    matchFilter: options.matchFilter ?? "all",
     analysisStatus: options.analysisStatus ?? "all",
   };
 }
@@ -112,8 +101,7 @@ export async function fetchUserApplicationsPage({
   }
 
   const safeOffset = normalizeOffset(offset);
-  const { pageSize, matchFilter, analysisStatus } =
-    normalizeOptions(options);
+  const { pageSize, analysisStatus } = normalizeOptions(options);
   const supabase = createClient();
   let request = supabase
     .from("candidaturas")
@@ -122,23 +110,6 @@ export async function fetchUserApplicationsPage({
 
   if (analysisStatus !== "all") {
     request = request.eq("analysis_status", analysisStatus);
-  }
-
-  switch (matchFilter) {
-    case "good":
-      request = request.gte("match_score", 80);
-      break;
-    case "medium":
-      request = request.gte("match_score", 60).lt("match_score", 80);
-      break;
-    case "weak":
-      request = request.lt("match_score", 60);
-      break;
-    case "unscored":
-      request = request.is("match_score", null);
-      break;
-    case "all":
-      break;
   }
 
   const primaryOrder =

@@ -32,7 +32,6 @@ function ApplicationsSkeleton() {
           key={index}
           className="flex items-center gap-4 rounded-2xl border bg-card p-4"
         >
-          <Skeleton className="size-14 shrink-0 rounded-xl" />
           <div className="flex-1 space-y-2">
             <Skeleton className="h-4 w-2/3 max-w-72" />
             <Skeleton className="h-3 w-1/3 max-w-40" />
@@ -189,7 +188,7 @@ export default function InicioPage() {
             />
             <StatCard
               title="Nova análise"
-              description="Envie uma vaga e descubra como adaptar seu currículo para aumentar a aderência."
+              description="Envie uma vaga e descubra como adaptar seu currículo para destacar sua experiência relevante."
               actionLabel="Começar análise"
               href="/nova-analise"
               icon={Sparkles}
@@ -271,7 +270,7 @@ export default function InicioPage() {
                 id={application.id}
                 title={application.vaga_titulo}
                 company={application.empresa}
-                matchScore={application.match_score}
+                status={application.status}
                 createdAt={application.created_at}
                 analysisStatus={application.analysis_status}
               />

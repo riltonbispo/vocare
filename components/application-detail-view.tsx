@@ -21,10 +21,7 @@ import {
   applicationStatusLabels,
   type ApplicationDetail,
 } from "@/lib/applications";
-import type {
-  ApplicationStatus,
-  Json,
-} from "@/lib/supabase/database.types";
+import type { ApplicationStatus } from "@/lib/supabase/database.types";
 import { triggerBlobDownload } from "@/lib/browser/download";
 import {
   buildGmailComposeUrl,
@@ -46,11 +43,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Progress,
-  ProgressLabel,
-  ProgressValue,
-} from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -182,51 +174,6 @@ function EmptySection({ children }: { children: string }) {
       {children}
     </p>
   );
-}
-
-function GapAnalysis({ value }: { value: Json | null }) {
-  if (value === null) {
-    return (
-      <EmptySection>
-        A análise de lacunas não foi salva neste registro.
-      </EmptySection>
-    );
-  }
-
-  if (typeof value === "string") {
-    return <div className="whitespace-pre-wrap">{value}</div>;
-  }
-
-  if (Array.isArray(value)) {
-    return (
-      <ul className="list-disc space-y-2 pl-5">
-        {value.map((item, index) => (
-          <li key={index}>
-            {typeof item === "string" ? item : JSON.stringify(item)}
-          </li>
-        ))}
-      </ul>
-    );
-  }
-
-  if (typeof value === "object") {
-    return (
-      <dl className="grid gap-4">
-        {Object.entries(value).map(([key, item]) => (
-          <div key={key}>
-            <dt className="font-medium">{key}</dt>
-            <dd className="mt-1 whitespace-pre-wrap text-muted-foreground">
-              {typeof item === "string"
-                ? item
-                : JSON.stringify(item, null, 2)}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    );
-  }
-
-  return <p>{String(value)}</p>;
 }
 
 function DetailSkeleton() {
@@ -633,7 +580,6 @@ export function ApplicationDetailView({ id }: { id: string }) {
                 <TabsList>
                   <TabsTrigger value="vaga">Vaga</TabsTrigger>
                   <TabsTrigger value="curriculo">Currículo</TabsTrigger>
-                  <TabsTrigger value="resultado">Resultado</TabsTrigger>
                   <TabsTrigger value="email">Email</TabsTrigger>
                 </TabsList>
               </div>
@@ -710,44 +656,6 @@ export function ApplicationDetailView({ id }: { id: string }) {
                     application={application}
                     queryKey={queryKey}
                   />
-                </div>
-              </TabsContent>
-
-              <TabsContent value="resultado">
-                <div className="grid gap-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Match score</CardTitle>
-                      <CardDescription>
-                        Aderência do currículo à vaga.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      {application.match_score === null ? (
-                        <EmptySection>
-                          O match score não foi salvo neste registro.
-                        </EmptySection>
-                      ) : (
-                        <Progress value={application.match_score}>
-                          <ProgressLabel>Aderência</ProgressLabel>
-                          <ProgressValue>
-                            {() => `${application.match_score}%`}
-                          </ProgressValue>
-                        </Progress>
-                      )}
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Gap analysis</CardTitle>
-                      <CardDescription>
-                        Competências e requisitos a desenvolver.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <GapAnalysis value={application.gap_analysis} />
-                    </CardContent>
-                  </Card>
                 </div>
               </TabsContent>
 

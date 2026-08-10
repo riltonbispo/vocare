@@ -1,7 +1,5 @@
 -- Completa o histórico sem reprocessar análises já existentes.
 alter table public.candidaturas
-  add column if not exists match_score smallint,
-  add column if not exists gap_analysis jsonb,
   add column if not exists curriculo_original_url text,
   add column if not exists notas text;
 
@@ -27,9 +25,7 @@ alter table public.candidaturas
         'rejeitado',
         'arquivado'
       )
-    ),
-  add constraint candidaturas_match_score_check
-    check (match_score is null or match_score between 0 and 100);
+    );
 
 alter table public.candidaturas
   alter column status set default 'aplicado';

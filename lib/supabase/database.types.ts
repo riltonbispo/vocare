@@ -103,8 +103,6 @@ export type Database = {
           email_outreach: string | null;
           error_code: string | null;
           last_error: string | null;
-          match_score: number | null;
-          gap_analysis: Json | null;
           notas: string | null;
           retry_count: number;
           status: ApplicationStatus;
@@ -127,8 +125,6 @@ export type Database = {
           email_outreach?: string | null;
           error_code?: string | null;
           last_error?: string | null;
-          match_score?: number | null;
-          gap_analysis?: Json | null;
           notas?: string | null;
           retry_count?: number;
           status?: ApplicationStatus;
@@ -151,8 +147,6 @@ export type Database = {
           email_outreach?: string | null;
           error_code?: string | null;
           last_error?: string | null;
-          match_score?: number | null;
-          gap_analysis?: Json | null;
           notas?: string | null;
           retry_count?: number;
           status?: ApplicationStatus;

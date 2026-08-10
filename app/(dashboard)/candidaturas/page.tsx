@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { BriefcaseBusiness, Filter, Trash2 } from "lucide-react";
+import { BriefcaseBusiness, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -19,32 +19,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   useUserApplications,
   userApplicationsKeys,
-  type MatchFilter,
   type UserApplication,
 } from "@/hooks/use-user-applications";
-
-const matchFilters: { value: MatchFilter; label: string }[] = [
-  { value: "all", label: "Todas" },
-  { value: "good", label: "Match bom" },
-  { value: "medium", label: "Match médio" },
-  { value: "weak", label: "Match fraco" },
-  { value: "unscored", label: "Sem score" },
-];
-
-function isMatchFilter(value: unknown): value is MatchFilter {
-  return matchFilters.some((filter) => filter.value === value);
-}
 
 function ApplicationsSkeleton() {
   return (
@@ -60,7 +40,6 @@ function ApplicationsSkeleton() {
           key={index}
           className="flex items-center gap-4 rounded-2xl border bg-card p-4"
         >
-          <Skeleton className="size-14 shrink-0 rounded-xl" />
           <div className="flex-1 space-y-2">
             <Skeleton className="h-4 w-2/3 max-w-72" />
             <Skeleton className="h-3 w-1/3 max-w-40" />
@@ -89,19 +68,16 @@ async function deleteApplication(id: string) {
 
 export default function CandidaturasPage() {
   const queryClient = useQueryClient();
-  const [matchFilter, setMatchFilter] = useState<MatchFilter>("all");
   const [applicationToDelete, setApplicationToDelete] =
     useState<UserApplication | null>(null);
   const applicationsQuery = useUserApplications({
     pageSize: 10,
-    matchFilter,
     analysisStatus: "all",
   });
   const totalQuery = useUserApplications({
     pageSize: 1,
     analysisStatus: "all",
   });
-  const isFiltered = matchFilter !== "all";
   const totalApplications = totalQuery.error
     ? applicationsQuery.total
     : totalQuery.total;
@@ -130,7 +106,7 @@ export default function CandidaturasPage() {
 
   return (
     <div className="space-y-7">
-      <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+      <header>
         <div>
           <p className="mb-2 text-sm font-medium text-muted-foreground">
             Histórico de análises
@@ -151,37 +127,6 @@ export default function CandidaturasPage() {
           <p className="mt-2 text-muted-foreground">
             Consulte todas as vagas que você já comparou com seu currículo.
           </p>
-        </div>
-
-        <div className="grid w-full gap-2 sm:w-52">
-          <Label htmlFor="match-filter" className="text-xs text-muted-foreground">
-            Filtrar por compatibilidade
-          </Label>
-          <Select
-            value={matchFilter}
-            onValueChange={(value) => {
-              setMatchFilter(isMatchFilter(value) ? value : "all");
-            }}
-          >
-            <SelectTrigger
-              id="match-filter"
-              className="w-full bg-background"
-              aria-label="Filtrar candidaturas por compatibilidade"
-            >
-              <Filter aria-hidden="true" />
-              <span className="flex-1 text-left">
-                {matchFilters.find((filter) => filter.value === matchFilter)
-                  ?.label ?? "Todas"}
-              </span>
-            </SelectTrigger>
-            <SelectContent>
-              {matchFilters.map((filter) => (
-                <SelectItem key={filter.value} value={filter.value}>
-                  {filter.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       </header>
 
@@ -218,7 +163,7 @@ export default function CandidaturasPage() {
             Tentar novamente
           </Button>
         </div>
-      ) : applicationsQuery.applications.length === 0 && !isFiltered ? (
+      ) : applicationsQuery.applications.length === 0 ? (
         <EmptyState
           icon={BriefcaseBusiness}
           title="Nenhuma candidatura ainda"
@@ -226,27 +171,6 @@ export default function CandidaturasPage() {
           actionLabel="Criar primeira análise"
           href="/nova-analise"
         />
-      ) : applicationsQuery.applications.length === 0 ? (
-        <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed bg-card px-5 py-10 text-center">
-          <Filter
-            className="mb-4 size-6 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <h2 className="font-heading text-lg font-medium">
-            Nenhuma análise neste filtro
-          </h2>
-          <p className="mt-2 max-w-md text-sm text-muted-foreground">
-            Tente outra faixa de compatibilidade para consultar seu histórico.
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            className="mt-6"
-            onClick={() => setMatchFilter("all")}
-          >
-            Mostrar todas
-          </Button>
-        </div>
       ) : (
         <div className="space-y-4">
           {applicationsQuery.error && (
@@ -279,7 +203,7 @@ export default function CandidaturasPage() {
                 id={application.id}
                 title={application.vaga_titulo}
                 company={application.empresa}
-                matchScore={application.match_score}
+                status={application.status}
                 createdAt={application.created_at}
                 analysisStatus={application.analysis_status}
                 deleting={
