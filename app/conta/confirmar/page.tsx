@@ -76,8 +76,8 @@ export default function ConfirmarContaPage() {
                 Conta concluída. Seu histórico continua vinculado ao mesmo
                 usuário.
               </p>
-              <Link href="/historico" className={buttonVariants()}>
-                Ver histórico
+              <Link href="/candidaturas" className={buttonVariants()}>
+                Ver candidaturas
               </Link>
             </div>
           ) : !user ? (

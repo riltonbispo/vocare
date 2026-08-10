@@ -145,7 +145,7 @@ export default function ContaPage() {
 
       if (loginError) throw loginError;
 
-      router.push("/historico");
+      router.push("/inicio");
       router.refresh();
     } catch (loginError) {
       setError(
@@ -165,7 +165,7 @@ export default function ContaPage() {
       const supabase = createClient();
       const { error: signOutError } = await supabase.auth.signOut();
       if (signOutError) throw signOutError;
-      window.location.assign("/");
+      window.location.assign("/inicio");
     } catch (signOutError) {
       setError(
         signOutError instanceof Error

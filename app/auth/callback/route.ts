@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 
 function safeNextPath(value: string | null) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) {
-    return "/historico";
+    return "/inicio";
   }
 
   return value;
