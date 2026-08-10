@@ -1,21 +1,23 @@
 "use client";
 
 import { useState, type ChangeEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { SparklesIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
+
+import { AnalysisResults } from "@/components/analysis-results";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { SparklesIcon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { AnalysisResults } from "@/components/analysis-results";
+import { Textarea } from "@/components/ui/textarea";
 import { useAnonymousSession } from "@/hooks/use-anonymous-session";
 import {
   classifyCurriculumFile,
@@ -32,7 +34,8 @@ interface AnalysisResult {
   empresa: string | null;
 }
 
-export default function Home() {
+export function AnalysisFlow() {
+  const queryClient = useQueryClient();
   const {
     session,
     loading: sessionLoading,
@@ -56,7 +59,7 @@ export default function Home() {
   }
 
   async function handleCurriculumFileChange(
-    event: ChangeEvent<HTMLInputElement>
+    event: ChangeEvent<HTMLInputElement>,
   ) {
     const file = event.target.files?.[0] ?? null;
 
@@ -109,7 +112,7 @@ export default function Home() {
         formData.append("curriculumFile", curriculumFile);
       }
 
-      const res = curriculumFile
+      const response = curriculumFile
         ? await fetch("/api/analyze", {
             method: "POST",
             body: formData,
@@ -125,27 +128,34 @@ export default function Home() {
             }),
           });
 
-      if (!res.ok) {
-        const data = await res.json();
+      if (!response.ok) {
+        const data = (await response.json()) as { error?: string };
         throw new Error(data.error ?? "Erro ao processar.");
       }
 
-      const data: AnalysisResult = await res.json();
+      const data = (await response.json()) as AnalysisResult;
       setResult(data);
       setVagaTitulo((current) => current.trim() || data.vagaTitulo || "");
       setEmpresa((current) => current.trim() || data.empresa || "");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro desconhecido.");
+      void queryClient.invalidateQueries({
+        queryKey: ["user-applications", session.user.id],
+      });
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Erro desconhecido.",
+      );
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <main className="container mx-auto max-w-7xl py-10 px-6">
+    <div className="min-w-0">
       <div className="mb-8 flex flex-col gap-3">
-        <Badge className="w-fit">TalentFlow AI</Badge>
-        <h1 className="text-4xl font-bold tracking-tight">
+        <Badge className="w-fit">Vocare IA</Badge>
+        <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
           Otimize seu currículo para qualquer vaga.
         </h1>
         <p className="max-w-2xl text-muted-foreground">
@@ -193,9 +203,9 @@ export default function Home() {
           <CardContent>
             <Textarea
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(event) => setDescription(event.target.value)}
               placeholder="Cole aqui a descrição da vaga..."
-              className="min-h-[420px] max-h-72 resize-none"
+              className="min-h-72 resize-y lg:min-h-[420px]"
             />
           </CardContent>
         </Card>
@@ -238,14 +248,14 @@ export default function Home() {
             </div>
             <Textarea
               value={curriculumFile ? "" : curriculum}
-              onChange={(e) => setCurriculum(e.target.value)}
+              onChange={(event) => setCurriculum(event.target.value)}
               placeholder={
                 curriculumFile
                   ? "PDF selecionado para análise."
                   : `# João Silva\n\n## Experiência\n\n### Desenvolvedor Full Stack\n- Ruby on Rails\n- React\n- PostgreSQL`
               }
               disabled={Boolean(curriculumFile)}
-              className="min-h-[420px] max-h-72 resize-none font-mono disabled:opacity-60"
+              className="min-h-72 resize-y font-mono disabled:opacity-60 lg:min-h-[420px]"
             />
           </CardContent>
         </Card>
@@ -253,7 +263,9 @@ export default function Home() {
 
       <div className="mt-8 flex flex-col items-end gap-2">
         {(error || sessionError) && (
-          <p className="text-sm text-destructive">{error ?? sessionError}</p>
+          <p className="text-sm text-destructive" role="alert">
+            {error ?? sessionError}
+          </p>
         )}
         <Button
           size="lg"
@@ -280,6 +292,6 @@ export default function Home() {
           recruiterEmail={result.recruiterEmail}
         />
       )}
-    </main>
+    </div>
   );
 }
