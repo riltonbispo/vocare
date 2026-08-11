@@ -11,10 +11,10 @@ const DEFAULT_GEMINI_MODELS = [
 const GEMINI_MODELS = resolveGeminiModels();
 const GEMINI_TIMEOUT_MS = parsePositiveInteger(
   process.env.GEMINI_TIMEOUT_MS,
-  25_000,
+  50_000,
 );
 
-// Default worst case: 3 models * 25s per-model timeout = about 75 seconds.
+// Default worst case: 3 models * 50s per-model timeout = about 150 seconds.
 
 const analysisResponseSchema = {
   type: Type.OBJECT,
