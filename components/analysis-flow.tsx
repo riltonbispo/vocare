@@ -29,6 +29,7 @@ interface AnalysisResult {
   email: string;
   emailSubject: string;
   emailBody: string;
+  cartaApresentacao: string;
   recruiterEmail: string | null;
   vagaTitulo: string | null;
   empresa: string | null;
@@ -289,6 +290,7 @@ export function AnalysisFlow() {
           curriculum={result.curriculum}
           emailSubject={result.emailSubject}
           emailBody={result.emailBody}
+          cartaApresentacao={result.cartaApresentacao}
           recruiterEmail={result.recruiterEmail}
         />
       )}

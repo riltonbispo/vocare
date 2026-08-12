@@ -103,6 +103,7 @@ async function saveCandidatura({
   curriculum,
   optimizedCurriculum,
   outreachEmail,
+  cartaApresentacao,
 }: {
   vagaTitulo: string | null;
   empresa: string | null;
@@ -110,6 +111,7 @@ async function saveCandidatura({
   curriculum: string;
   optimizedCurriculum: string;
   outreachEmail: string;
+  cartaApresentacao: string;
 }) {
   try {
     const supabase = await createSupabaseClient();
@@ -135,6 +137,7 @@ async function saveCandidatura({
       curriculo_original: curriculum,
       curriculo_otimizado: optimizedCurriculum,
       email_outreach: outreachEmail,
+      carta_apresentacao: cartaApresentacao,
     });
 
     if (insertError) {
@@ -196,6 +199,7 @@ export async function POST(req: NextRequest) {
       curriculum: originalCurriculum,
       optimizedCurriculum: result.curriculoMarkdown,
       outreachEmail,
+      cartaApresentacao: result.cartaApresentacao,
     });
 
     return NextResponse.json({
@@ -203,6 +207,7 @@ export async function POST(req: NextRequest) {
       email: outreachEmail,
       emailSubject: result.email.assunto,
       emailBody: result.email.corpo,
+      cartaApresentacao: result.cartaApresentacao,
       recruiterEmail,
       vagaTitulo: resolvedJobTitle,
       empresa: resolvedCompany,

@@ -93,6 +93,7 @@ export type Database = {
           user_id: string;
           vaga_titulo: string | null;
           empresa: string | null;
+          carta_apresentacao: string | null;
           descricao_vaga: string | null;
           curriculo_original: string | null;
           curriculo_original_url: string | null;
@@ -115,6 +116,7 @@ export type Database = {
           user_id: string;
           vaga_titulo?: string | null;
           empresa?: string | null;
+          carta_apresentacao?: string | null;
           descricao_vaga?: string | null;
           curriculo_original?: string | null;
           curriculo_original_url?: string | null;
@@ -137,6 +139,7 @@ export type Database = {
           user_id?: string;
           vaga_titulo?: string | null;
           empresa?: string | null;
+          carta_apresentacao?: string | null;
           descricao_vaga?: string | null;
           curriculo_original?: string | null;
           curriculo_original_url?: string | null;

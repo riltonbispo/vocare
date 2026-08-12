@@ -182,16 +182,17 @@ Executa o ESLint no projeto.
 4. Revise o currículo otimizado.
 5. Baixe o resultado em Markdown ou PDF.
 6. Revise o e-mail gerado e abra no Gmail ou no cliente de e-mail padrão.
-7. No detalhe da candidatura, selecione canais existentes ou digite um novo
+7. Revise, copie ou exporte a carta de apresentação em PDF.
+8. No detalhe da candidatura, selecione canais existentes ou digite um novo
    canal e pressione `Enter` para criá-lo e associá-lo.
-8. Em `/historico`, consulte os canais nos badges dos cartões ou filtre as
+9. Em `/historico`, consulte os canais nos badges dos cartões ou filtre as
    candidaturas por um canal específico.
 
 ## Variáveis de Ambiente
 
 | Nome | Obrigatória | Descrição |
 | --- | --- | --- |
-| `GEMINI_API_KEY` | Sim | Chave usada na análise estruturada do currículo, da vaga e do e-mail com Gemini. |
+| `GEMINI_API_KEY` | Sim | Chave usada na análise estruturada do currículo, da vaga, do e-mail e da carta de apresentação com Gemini. |
 | `GEMINI_MODELS` | Não | Lista ordenada, separada por vírgulas, dos modelos usados na análise. Em erros transitórios, modelo ausente ou resposta inválida, a rota tenta o próximo. O padrão é `gemini-3.6-flash,gemini-3.5-flash-lite,gemini-2.5-flash`. |
 | `GEMINI_TIMEOUT_MS` | Não | Tempo limite de cada tentativa em milissegundos; o padrão é `25000`. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Sim | URL pública do projeto Supabase. |
@@ -202,8 +203,8 @@ Executa o ESLint no projeto.
 | Rota | Método | Descrição |
 | --- | --- | --- |
 | `/` | `GET` | Interface principal da aplicação. |
-| `/api/analyze` | `POST` | Recebe descrição da vaga e currículo, faz uma análise estruturada com Gemini e retorna currículo/e-mail gerados. |
-| `/api/pdf` | `POST` | Recebe Markdown e retorna um PDF renderizado. |
+| `/api/analyze` | `POST` | Recebe descrição da vaga e currículo, faz uma análise estruturada com Gemini e retorna currículo, e-mail e carta de apresentação. |
+| `/api/pdf` | `POST` | Recebe o conteúdo e o tipo do documento e retorna o currículo ou a carta de apresentação em PDF. |
 | `/api/application-channels` | `GET`, `POST` | Lista os canais reutilizáveis da sessão atual ou cria um novo canal. |
 | `/api/applications/[id]` | `GET`, `PATCH`, `DELETE` | Consulta, atualiza ou exclui uma candidatura da sessão atual. |
 | `/api/applications/[id]/channels` | `GET`, `POST`, `DELETE` | Lista, associa ou remove canais da candidatura, após validar a sessão e a propriedade dos recursos. |

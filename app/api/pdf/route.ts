@@ -1,23 +1,81 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildResumeHtml } from "@/lib/pdf-template";
+import { buildCoverLetterHtml, buildResumeHtml } from "@/lib/pdf-template";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
+
+const MAX_CONTENT_LENGTH = 500_000;
+
+type PdfDocumentType = "resume" | "cover-letter";
+
+function isPdfDocumentType(value: unknown): value is PdfDocumentType {
+  return value === "resume" || value === "cover-letter";
+}
+
+function safeFilename(value: unknown, fallback: string) {
+  if (typeof value !== "string") return fallback;
+
+  const filename = value
+    .trim()
+    .replace(/\.pdf$/i, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/^[.-]+|[.-]+$/g, "")
+    .slice(0, 100);
+
+  return filename || fallback;
+}
 
 export async function POST(req: NextRequest) {
   let browser: import("puppeteer-core").Browser | undefined;
 
   try {
-    const { markdown, filename = "curriculo" } = await req.json();
+    let body: unknown;
 
-    if (!markdown?.trim()) {
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "JSON inválido." }, { status: 400 });
+    }
+
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
       return NextResponse.json(
-        { error: "Markdown é obrigatório." },
-        { status: 400 }
+        { error: "Corpo da requisição inválido." },
+        { status: 400 },
       );
     }
 
-    const html = buildResumeHtml(markdown);
+    const payload = body as Record<string, unknown>;
+    const documentType =
+      payload.documentType === undefined ? "resume" : payload.documentType;
+
+    if (!isPdfDocumentType(documentType)) {
+      return NextResponse.json(
+        { error: "Tipo de documento inválido." },
+        { status: 400 },
+      );
+    }
+
+    if (typeof payload.markdown !== "string" || !payload.markdown.trim()) {
+      return NextResponse.json(
+        { error: "Conteúdo é obrigatório." },
+        { status: 400 },
+      );
+    }
+
+    if (payload.markdown.length > MAX_CONTENT_LENGTH) {
+      return NextResponse.json(
+        { error: "Conteúdo excede o limite permitido." },
+        { status: 400 },
+      );
+    }
+
+    const fallbackFilename =
+      documentType === "cover-letter" ? "carta-de-apresentacao" : "curriculo";
+    const filename = safeFilename(payload.filename, fallbackFilename);
+    const html =
+      documentType === "cover-letter"
+        ? buildCoverLetterHtml(payload.markdown)
+        : buildResumeHtml(payload.markdown);
     const isLocal = process.env.NODE_ENV === "development";
 
     if (isLocal) {

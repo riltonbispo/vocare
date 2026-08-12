@@ -1,5 +1,14 @@
 import { marked } from "marked";
 
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 export function buildResumeHtml(markdown: string, candidateName = "Currículo") {
   const contentHtml = marked.parse(markdown, { breaks: true });
 
@@ -92,6 +101,55 @@ export function buildResumeHtml(markdown: string, candidateName = "Currículo") 
 </head>
 <body>
   ${contentHtml}
+</body>
+</html>
+`;
+}
+
+export function buildCoverLetterHtml(content: string) {
+  const escapedContent = escapeHtml(content);
+
+  return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<title>Carta de apresentação</title>
+<style>
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    margin: 0;
+    min-height: 100%;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #262626;
+    background: #ffffff;
+    padding: 72px 76px;
+    font-size: 14px;
+    line-height: 1.75;
+  }
+
+  .letter-content {
+    max-width: 642px;
+    margin: 0 auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+</style>
+</head>
+<body>
+  <main class="letter-content">${escapedContent}</main>
 </body>
 </html>
 `;

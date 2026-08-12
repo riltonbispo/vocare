@@ -52,6 +52,11 @@ const analysisResponseSchema = {
       },
       required: ["assunto", "corpo"],
     },
+    cartaApresentacao: {
+      type: Type.STRING,
+      description:
+        "Carta de apresentação curta, profissional e personalizada para o candidato e para a vaga, em texto simples.",
+    },
   },
   required: [
     "vagaTitulo",
@@ -59,6 +64,7 @@ const analysisResponseSchema = {
     "curriculoOriginalTexto",
     "curriculoMarkdown",
     "email",
+    "cartaApresentacao",
   ],
 };
 
@@ -74,6 +80,7 @@ const analysisResultSchema = z
         corpo: z.string().trim().min(80),
       })
       .strict(),
+    cartaApresentacao: z.string().trim().min(1),
   })
   .strict();
 
@@ -421,7 +428,7 @@ async function generateAnalysis(
   );
 }
 
-function parseAnalysisResult(
+export function parseAnalysisResult(
   responseText: string | undefined,
   curriculumKind: CurriculumInput["kind"],
 ) {

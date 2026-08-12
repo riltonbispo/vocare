@@ -8,7 +8,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Mail01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { toast } from "sonner";
+import { CopyButton } from "@/components/copy-button";
+import { PdfDownloadButton } from "@/components/pdf-download-button";
 import { buildGmailComposeUrl, buildMailtoUrl } from "@/lib/email-utils";
 import { triggerBlobDownload } from "@/lib/browser/download";
 
@@ -20,22 +21,17 @@ export function AnalysisResults({
   curriculum,
   emailSubject,
   emailBody,
+  cartaApresentacao,
   recruiterEmail,
 }: {
   curriculum: string;
   emailSubject: string;
   emailBody: string;
+  cartaApresentacao: string;
   recruiterEmail: string | null;
 }) {
-  const [copied, setCopied] = useState<"curriculum" | "email" | null>(null);
-  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [to, setTo] = useState(recruiterEmail ?? "");
-
-  async function copy(text: string, which: "curriculum" | "email") {
-    await navigator.clipboard.writeText(text);
-    setCopied(which);
-    setTimeout(() => setCopied(null), 1500);
-  }
+  const formattedEmail = `Assunto: ${emailSubject}\n\n${emailBody}`;
 
   function openGmail() {
     const url = buildGmailComposeUrl({
@@ -51,42 +47,6 @@ export function AnalysisResults({
     window.location.href = url;
   }
 
-  async function downloadPdf() {
-    setDownloadingPdf(true);
-
-    try {
-      const response = await fetch("/api/pdf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          markdown: curriculum,
-          filename: "curriculo-otimizado",
-        }),
-      });
-
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        throw new Error(body?.error ?? "Não foi possível gerar o PDF.");
-      }
-
-      triggerBlobDownload(
-        await response.blob(),
-        "curriculo-otimizado.pdf",
-      );
-      toast.success("PDF gerado para download.");
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Não foi possível gerar o PDF.",
-      );
-    } finally {
-      setDownloadingPdf(false);
-    }
-  }
-
   return (
     <section className="mt-16">
       <div className="mb-8">
@@ -97,24 +57,28 @@ export function AnalysisResults({
       </div>
 
       <Tabs defaultValue="curriculum">
-        <TabsList>
-          <TabsTrigger value="curriculum">📄 Currículo</TabsTrigger>
-          <TabsTrigger value="email">✉️ E-mail</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-1">
+          <TabsList>
+            <TabsTrigger value="curriculum">📄 Currículo</TabsTrigger>
+            <TabsTrigger value="email">✉️ E-mail</TabsTrigger>
+            <TabsTrigger value="cover-letter">
+              📝 Carta de Apresentação
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="curriculum">
           <div className="grid gap-8 lg:grid-cols-3">
             <Card className="lg:col-span-2">
               <CardContent className="p-8">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <span className="font-bold">CURRICULO-OTIMIZADO.md</span>
-                  <Button
+                  <CopyButton
+                    text={curriculum}
                     size="sm"
                     variant="outline"
-                    onClick={() => copy(curriculum, "curriculum")}
-                  >
-                    {copied === "curriculum" ? "Copiado!" : "Copiar"}
-                  </Button>
+                    aria-label="Copiar currículo otimizado"
+                  />
                 </div>
                 <div className="divider my-4 border-t" />
                 <article className="prose max-w-none">
@@ -126,12 +90,11 @@ export function AnalysisResults({
             <Card>
               <CardContent className="flex flex-col gap-2 p-8">
                 <h3 className="mb-2 font-bold">Ações</h3>
-                <Button
+                <CopyButton
+                  text={curriculum}
                   variant="outline"
-                  onClick={() => copy(curriculum, "curriculum")}
-                >
-                  Copiar Markdown
-                </Button>
+                  label="Copiar Markdown"
+                />
                 <Button
                   variant="outline"
                   onClick={() =>
@@ -144,13 +107,12 @@ export function AnalysisResults({
                 >
                   Baixar Markdown
                 </Button>
-                <Button
+                <PdfDownloadButton
+                  content={curriculum}
+                  documentType="resume"
+                  filename="curriculo-otimizado"
                   variant="outline"
-                  onClick={() => void downloadPdf()}
-                  disabled={downloadingPdf}
-                >
-                  {downloadingPdf ? "Gerando PDF..." : "Baixar PDF"}
-                </Button>
+                />
               </CardContent>
             </Card>
           </div>
@@ -159,7 +121,15 @@ export function AnalysisResults({
           <div className="grid gap-8 lg:grid-cols-3">
             <Card className="lg:col-span-2">
               <CardContent className="p-8">
-                <span className="font-bold">EMAIL.md</span>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="font-bold">EMAIL.md</span>
+                  <CopyButton
+                    text={formattedEmail}
+                    label="Copiar e-mail"
+                    size="sm"
+                    variant="outline"
+                  />
+                </div>
                 <div className="divider my-4 border-t" />
                 <p className="mb-2 text-sm font-medium">
                   Assunto: {emailSubject}
@@ -195,6 +165,36 @@ export function AnalysisResults({
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+        <TabsContent value="cover-letter">
+          <Card>
+            <CardContent className="p-8">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <span className="font-bold">CARTA DE APRESENTAÇÃO</span>
+                <div className="flex flex-wrap gap-2">
+                  <CopyButton
+                    text={cartaApresentacao}
+                    label="Copiar carta"
+                    size="sm"
+                    variant="outline"
+                  />
+                  <PdfDownloadButton
+                    content={cartaApresentacao}
+                    documentType="cover-letter"
+                    filename="carta-de-apresentacao"
+                    label="Baixar PDF"
+                    size="sm"
+                    variant="outline"
+                    successMessage="Carta exportada em PDF."
+                  />
+                </div>
+              </div>
+              <div className="divider my-4 border-t" />
+              <article className="whitespace-pre-wrap leading-7">
+                {cartaApresentacao}
+              </article>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </section>

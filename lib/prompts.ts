@@ -31,7 +31,7 @@ export function buildAnalysisPrompt({
 
   return `Você é especialista em recrutamento, sistemas ATS (Applicant Tracking System), elaboração de currículos profissionais e comunicação para processos seletivos.
 
-Analise a descrição da vaga e o currículo original para produzir todos os campos solicitados pelo JSON Schema configurado na requisição.
+Analise a descrição da vaga e o currículo original para produzir todos os campos solicitados pelo JSON Schema configurado na requisição. Gere o currículo otimizado, o e-mail de candidatura e a carta de apresentação na mesma resposta estruturada.
 
 O currículo original está disponível como ${curriculumSource}. Ele é a fonte de verdade sobre o histórico, as qualificações e os dados pessoais do candidato.
 
@@ -243,6 +243,30 @@ Não apresente essa classificação na resposta, a menos que exista um campo esp
 - Preserve exatamente a grafia e os valores dos contatos.
 - Não invente telefone, e-mail, link, cidade ou qualquer outro dado.
 
+## Carta de apresentação
+
+### Campo cartaApresentacao
+
+- Escreva uma carta curta, profissional, natural e objetiva, em texto simples.
+- Use primeira pessoa. Essa regra se aplica somente à carta de apresentação; o currículo otimizado deve continuar impessoal.
+- Use aproximadamente de 2 a 4 parágrafos curtos no corpo da carta, além da saudação e da assinatura.
+- Comece com uma saudação natural, como "Olá,".
+- Apresente brevemente a área profissional ou o cargo do candidato e as competências comprovadas mais relevantes para a vaga.
+- Resuma experiências, projetos ou capacidades do currículo que tenham relação verdadeira com a oportunidade.
+- Explique de forma concreta e moderada por que o perfil pode contribuir para os desafios da posição.
+- Personalize a carta de acordo com a descrição da vaga e priorize experiências e tecnologias relacionadas à oportunidade.
+- Utilize o nome da empresa quando ele estiver disponível e puder ser mencionado naturalmente.
+- Utilize o título ou cargo da vaga quando isso tornar o texto mais natural.
+- Termine com "Atenciosamente," e o nome real do candidato exatamente como identificado no currículo.
+- Se o nome do candidato, a empresa ou o cargo não estiverem presentes de forma legível ou confiável nas fontes, não tente adivinhar nem inventar esses dados.
+- Todas as afirmações sobre o candidato devem estar sustentadas pelo currículo original. A descrição da vaga deve orientar somente a seleção e a ênfase das informações relevantes.
+- Não invente experiências, tecnologias, resultados, tempo de experiência, formações, projetos ou competências.
+- Não afirme domínio, experiência ou familiaridade com uma tecnologia apenas porque ela aparece nos requisitos da vaga.
+- Evite exageros, clichês, autopromoção excessiva e frases genéricas que poderiam servir para qualquer candidato.
+- Não mencione que o currículo foi adaptado, que houve análise por IA ou que o texto foi gerado automaticamente.
+- Não copie o e-mail de candidatura. O e-mail é uma mensagem curta para encaminhar a candidatura; a carta deve apresentar o perfil e sua relação com a oportunidade de forma um pouco mais estruturada.
+- Não utilize Markdown, listas ou títulos dentro da carta.
+
 ## Verificação final obrigatória
 
 Antes de produzir a resposta estruturada, confirme internamente que:
@@ -252,6 +276,8 @@ Antes de produzir a resposta estruturada, confirme internamente que:
 - Nenhuma experiência, responsabilidade ou métrica foi inventada.
 - Todas as datas e informações de contato foram preservadas.
 - O currículo otimizado continua representando fielmente o candidato.
+- A carta de apresentação está em primeira pessoa, usa somente fatos comprovados pelo currículo e está personalizada para a vaga.
+- A carta de apresentação não é uma cópia do e-mail de candidatura.
 - O conteúdo está em português natural e profissional.
 - Não há texto fora dos campos definidos pelo JSON Schema.`;
 }
