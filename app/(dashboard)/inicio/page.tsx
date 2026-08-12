@@ -3,13 +3,16 @@
 import {
   ArrowRight,
   BriefcaseBusiness,
-  FileText,
   Sparkles,
+  Zap,
 } from "lucide-react";
 import Link from "next/link";
 
 import { ApplicationListItem } from "@/components/dashboard/application-list-item";
 import { EmptyState } from "@/components/dashboard/empty-state";
+import {
+  RegisterApplicationDialog,
+} from "@/components/dashboard/register-application-dialog";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -55,7 +58,6 @@ export default function InicioPage() {
     analysisStatus: "pending",
   });
   const draft = draftQuery.applications[0];
-  const lastCompleted = recentQuery.applications[0];
 
   return (
     <div className="space-y-8 lg:space-y-10">
@@ -170,32 +172,26 @@ export default function InicioPage() {
       )}
 
       <section className="grid gap-4 lg:grid-cols-2">
-        {recentQuery.isLoading ? (
-          <>
-            <Skeleton className="h-56 rounded-2xl" />
-            <Skeleton className="h-56 rounded-2xl" />
-          </>
-        ) : (
-          <>
-            <StatCard
-              title="Seu currículo"
-              description="Acesse a versão otimizada mais recente e continue refinando sua apresentação."
-              actionLabel="Ver currículo otimizado"
-              href={
-                lastCompleted ? `/historico/${lastCompleted.id}` : undefined
-              }
-              icon={FileText}
+        <StatCard
+          title="Registro rápido"
+          description="Adicione uma candidatura para acompanhar o processo sem enviar currículo ou iniciar uma análise."
+          action={
+            <RegisterApplicationDialog
+              userId={user?.id ?? null}
+              disabled={userLoading || !user}
+              triggerVariant="outline"
             />
-            <StatCard
-              title="Nova análise"
-              description="Envie uma vaga e descubra como adaptar seu currículo para destacar sua experiência relevante."
-              actionLabel="Começar análise"
-              href="/nova-analise"
-              icon={Sparkles}
-              featured
-            />
-          </>
-        )}
+          }
+          icon={Zap}
+        />
+        <StatCard
+          title="Nova análise"
+          description="Envie uma vaga e descubra como adaptar seu currículo para destacar sua experiência relevante."
+          actionLabel="Começar análise"
+          href="/nova-analise"
+          icon={Sparkles}
+          featured
+        />
       </section>
 
       <section aria-labelledby="recent-applications-title">

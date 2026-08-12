@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -11,20 +12,33 @@ import {
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-type StatCardProps = {
+type StatCardBaseProps = {
   title: string;
   description: string;
-  actionLabel: string;
-  href?: string;
   icon: LucideIcon;
   featured?: boolean;
 };
+
+type StatCardProps = StatCardBaseProps &
+  (
+    | {
+        action: ReactNode;
+        actionLabel?: never;
+        href?: never;
+      }
+    | {
+        action?: never;
+        actionLabel: string;
+        href?: string;
+      }
+  );
 
 export function StatCard({
   title,
   description,
   actionLabel,
   href,
+  action,
   icon: Icon,
   featured = false,
 }: StatCardProps) {
@@ -47,7 +61,9 @@ export function StatCard({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {href ? (
+        {action !== undefined ? (
+          action
+        ) : href ? (
           <Link
             href={href}
             className={buttonVariants({
