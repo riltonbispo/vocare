@@ -8,6 +8,9 @@ import { toast } from "sonner";
 import { ApplicationListItem } from "@/components/dashboard/application-list-item";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import {
+  RegisterApplicationDialog,
+} from "@/components/dashboard/register-application-dialog";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -106,10 +109,10 @@ export default function CandidaturasPage() {
 
   return (
     <div className="space-y-7">
-      <header>
-        <div>
+      <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <p className="mb-2 text-sm font-medium text-muted-foreground">
-            Histórico de análises
+            Acompanhamento de processos
           </p>
           <div className="flex flex-wrap items-baseline gap-3">
             <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -120,14 +123,18 @@ export default function CandidaturasPage() {
             ) : (
               <span className="text-sm text-muted-foreground">
                 {totalApplications}{" "}
-                {totalApplications === 1 ? "análise" : "análises"}
+                {totalApplications === 1 ? "candidatura" : "candidaturas"}
               </span>
             )}
           </div>
           <p className="mt-2 text-muted-foreground">
-            Consulte todas as vagas que você já comparou com seu currículo.
+            Registre oportunidades e acompanhe todas as suas candidaturas.
           </p>
         </div>
+        <RegisterApplicationDialog
+          userId={applicationsQuery.userId}
+          disabled={applicationsQuery.authLoading || !applicationsQuery.userId}
+        />
       </header>
 
       {applicationsQuery.isLoading ? (
@@ -167,7 +174,7 @@ export default function CandidaturasPage() {
         <EmptyState
           icon={BriefcaseBusiness}
           title="Nenhuma candidatura ainda"
-          description="Quando você concluir uma análise, a vaga aparecerá aqui para consulta."
+          description="Registre uma candidatura ou faça uma análise para começar seu acompanhamento."
           actionLabel="Criar primeira análise"
           href="/nova-analise"
         />

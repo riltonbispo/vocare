@@ -13,7 +13,11 @@ export type ApplicationStatus =
   | "rejeitado"
   | "arquivado";
 
-export type AnalysisStatus = "pending" | "completed" | "failed";
+export type AnalysisStatus =
+  | "pending"
+  | "completed"
+  | "failed"
+  | "nao_aplicavel";
 
 export type CurriculumInputKind = "text" | "pdf";
 

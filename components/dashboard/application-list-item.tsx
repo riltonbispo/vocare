@@ -1,4 +1,4 @@
-import { ArrowRight, Trash2 } from "lucide-react";
+import { ArrowRight, Zap, Trash2 } from "lucide-react";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +62,7 @@ export function ApplicationListItem({
   deleting = false,
 }: ApplicationListItemProps) {
   const statusPresentation = getStatusPresentation(status, analysisStatus);
+  const isQuickRegistration = analysisStatus === "nao_aplicavel";
   const applicationTitle = title ?? "Vaga sem título";
 
   return (
@@ -69,7 +70,7 @@ export function ApplicationListItem({
       <Link
         href={`/historico/${id}`}
         className="group flex min-w-0 flex-1 items-center gap-3 rounded-2xl p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:gap-4 sm:p-4"
-        aria-label={`Ver detalhes de ${applicationTitle}`}
+        aria-label={`Ver detalhes de ${applicationTitle}, status ${statusPresentation.label}${isQuickRegistration ? ", registro rápido sem análise" : ""}`}
       >
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium text-foreground">
@@ -78,10 +79,19 @@ export function ApplicationListItem({
           <p className="mt-1 truncate text-sm text-muted-foreground">
             {company ?? "Empresa não informada"}
           </p>
-          <div className="mt-1 flex items-center gap-2 sm:hidden">
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 sm:hidden">
             <Badge className={statusPresentation.className}>
               {statusPresentation.label}
             </Badge>
+            {isQuickRegistration && (
+              <Badge
+                variant="outline"
+                className="border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-300"
+              >
+                <Zap aria-hidden="true" />
+                Registro rápido
+              </Badge>
+            )}
             <span className="truncate text-xs text-muted-foreground">
               {dateFormatter.format(new Date(createdAt))}
             </span>
@@ -89,9 +99,20 @@ export function ApplicationListItem({
         </div>
 
         <div className="hidden shrink-0 space-y-1.5 text-right sm:block">
-          <Badge className={statusPresentation.className}>
-            {statusPresentation.label}
-          </Badge>
+          <div className="flex flex-wrap justify-end gap-1.5">
+            <Badge className={statusPresentation.className}>
+              {statusPresentation.label}
+            </Badge>
+            {isQuickRegistration && (
+              <Badge
+                variant="outline"
+                className="border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-300"
+              >
+                <Zap aria-hidden="true" />
+                Registro rápido
+              </Badge>
+            )}
+          </div>
           <p className="mt-1 text-xs text-muted-foreground">
             {dateFormatter.format(new Date(createdAt))}
           </p>

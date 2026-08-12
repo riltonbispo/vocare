@@ -447,7 +447,7 @@ function ApplicationEditor({
       <CardHeader>
         <CardTitle>Acompanhamento</CardTitle>
         <CardDescription>
-          Atualize sem refazer a análise.
+          Atualize os dados e o andamento da candidatura.
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-5">
@@ -566,7 +566,10 @@ export function ApplicationDetailView({ id }: { id: string }) {
                 {application.vaga_titulo || "Vaga sem título"}
               </h1>
               <p className="mt-2 text-muted-foreground">
-                {application.empresa || "Empresa não informada"} · Analisado em{" "}
+                {application.empresa || "Empresa não informada"} ·{" "}
+                {application.analysis_status === "nao_aplicavel"
+                  ? "Registrado em"
+                  : "Analisado em"}{" "}
                 {dateFormatter.format(new Date(application.created_at))}
               </p>
             </div>
@@ -591,7 +594,9 @@ export function ApplicationDetailView({ id }: { id: string }) {
                   <CardHeader>
                     <CardTitle>Descrição da vaga</CardTitle>
                     <CardDescription>
-                      Texto original usado na análise.
+                      {application.analysis_status === "nao_aplicavel"
+                        ? "Descrição ou link informado no registro."
+                        : "Texto original usado na análise."}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
