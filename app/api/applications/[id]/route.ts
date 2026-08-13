@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { APPLICATION_STATUSES } from "@/lib/applications";
+import { ORIGINAL_CURRICULUM_BUCKET } from "@/lib/application-reanalysis";
 import type { ApplicationStatus } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -212,7 +213,7 @@ export async function DELETE(
     .delete()
     .eq("id", parsedId.data)
     .eq("user_id", user.id)
-    .select("id")
+    .select("id, curriculo_arquivo_path")
     .maybeSingle();
 
   if (error) {
@@ -228,6 +229,20 @@ export async function DELETE(
       { error: "Candidatura não encontrada." },
       { status: 404 },
     );
+  }
+
+  if (data.curriculo_arquivo_path?.startsWith(`${user.id}/`)) {
+    try {
+      const { error: storageError } = await supabase.storage
+        .from(ORIGINAL_CURRICULUM_BUCKET)
+        .remove([data.curriculo_arquivo_path]);
+
+      if (storageError) {
+        console.warn("[applications:delete:curriculum]", storageError);
+      }
+    } catch (storageError) {
+      console.warn("[applications:delete:curriculum]", storageError);
+    }
   }
 
   return new NextResponse(null, { status: 204 });

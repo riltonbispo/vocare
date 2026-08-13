@@ -6,7 +6,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { toast } from "sonner";
 import {
@@ -22,6 +22,10 @@ import {
   type ApplicationDetail,
 } from "@/lib/applications";
 import type { ApplicationStatus } from "@/lib/supabase/database.types";
+import {
+  isActiveReanalysis,
+  REANALYSIS_ACTIVE_WINDOW_MS,
+} from "@/lib/application-reanalysis";
 import { triggerBlobDownload } from "@/lib/browser/download";
 import {
   buildGmailComposeUrl,
@@ -30,8 +34,10 @@ import {
   parseOutreachEmail,
 } from "@/lib/email-utils";
 import { useAnonymousSession } from "@/hooks/use-anonymous-session";
+import { userApplicationsKeys } from "@/hooks/use-user-applications";
 import { ApplicationChannelsField } from "@/components/application-channels-field";
 import { ApplicationCoverLetter } from "@/components/application-cover-letter";
+import { ApplicationReanalysisDialog } from "@/components/application-reanalysis-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -65,6 +71,43 @@ const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
   dateStyle: "long",
   timeStyle: "short",
 });
+function useActiveAnalysisPending(application: ApplicationDetail | undefined) {
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+  const analysisStatus = application?.analysis_status;
+  const updatedAt = application?.updated_at;
+
+  useEffect(() => {
+    if (analysisStatus !== "pending" || !updatedAt) return;
+
+    const updatedAtTime = Date.parse(updatedAt);
+
+    if (!Number.isFinite(updatedAtTime)) return;
+
+    const referenceTime = Math.max(currentTime, updatedAtTime);
+    const remainingTime =
+      REANALYSIS_ACTIVE_WINDOW_MS - (referenceTime - updatedAtTime);
+
+    if (remainingTime <= 0) return;
+
+    const timeout = window.setTimeout(
+      () => setCurrentTime(Date.now()),
+      remainingTime + 100,
+    );
+
+    return () => window.clearTimeout(timeout);
+  }, [analysisStatus, currentTime, updatedAt]);
+
+  if (analysisStatus !== "pending" || !updatedAt) return false;
+
+  const updatedAtTime = Date.parse(updatedAt);
+  const referenceTime = Math.max(currentTime, updatedAtTime);
+
+  return isActiveReanalysis({
+    analysisStatus,
+    updatedAt,
+    now: referenceTime,
+  });
+}
 
 class ApiError extends Error {
   constructor(
@@ -77,6 +120,14 @@ class ApiError extends Error {
 
 type ApplicationResponse = { application: ApplicationDetail };
 type ApplicationQueryKey = readonly ["application", string, string];
+type ApplicationAnalysisState = Pick<
+  ApplicationDetail,
+  | "analysis_status"
+  | "retry_count"
+  | "updated_at"
+  | "error_code"
+  | "last_error"
+>;
 type ApplicationUpdate = Partial<
   Pick<
     ApplicationDetail,
@@ -110,6 +161,25 @@ async function fetchApplication(id: string) {
     cache: "no-store",
   });
   return parseResponse(response);
+}
+
+async function fetchApplicationAnalysisState(id: string) {
+  const response = await fetch(`/api/applications/${id}/reanalyze`, {
+    cache: "no-store",
+  });
+  const body = (await response.json().catch(() => null)) as {
+    analysis?: ApplicationAnalysisState;
+    error?: string;
+  } | null;
+
+  if (!response.ok || !body?.analysis) {
+    throw new ApiError(
+      body?.error ?? "Não foi possível acompanhar a análise.",
+      response.status,
+    );
+  }
+
+  return { analysis: body.analysis };
 }
 
 async function updateApplication(id: string, update: ApplicationUpdate) {
@@ -189,9 +259,11 @@ function DetailSkeleton() {
 function CurriculumEditor({
   application,
   queryKey,
+  disabled = false,
 }: {
   application: ApplicationDetail;
   queryKey: ApplicationQueryKey;
+  disabled?: boolean;
 }) {
   const [curriculum, setCurriculum] = useState(
     application.curriculo_otimizado ?? "",
@@ -264,12 +336,13 @@ function CurriculumEditor({
             onChange={(event) => setCurriculum(event.target.value)}
             maxLength={500_000}
             placeholder="Edite ou insira o currículo otimizado..."
+            disabled={disabled}
             className="min-h-[32rem] font-mono text-sm"
           />
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button
               onClick={save}
-              disabled={mutation.isPending}
+              disabled={disabled || mutation.isPending}
               className="gap-2"
             >
               <HugeiconsIcon icon={SaveIcon} />
@@ -314,9 +387,11 @@ function CurriculumEditor({
 function EmailEditor({
   application,
   queryKey,
+  disabled = false,
 }: {
   application: ApplicationDetail;
   queryKey: ApplicationQueryKey;
+  disabled?: boolean;
 }) {
   const initialEmail = parseOutreachEmail(
     application.email_outreach ?? "",
@@ -359,6 +434,7 @@ function EmailEditor({
             type="email"
             value={to}
             onChange={(event) => setTo(event.target.value)}
+            disabled={disabled}
             autoComplete="email"
             placeholder="recrutamento@empresa.com"
           />
@@ -372,6 +448,7 @@ function EmailEditor({
             id="email-subject"
             value={subject}
             onChange={(event) => setSubject(event.target.value)}
+            disabled={disabled}
             maxLength={500}
             placeholder="Assunto do email"
           />
@@ -382,6 +459,7 @@ function EmailEditor({
             id="email-body"
             value={body}
             onChange={(event) => setBody(event.target.value)}
+            disabled={disabled}
             maxLength={99_000}
             placeholder="Escreva a mensagem de candidatura..."
             className="min-h-80"
@@ -390,7 +468,7 @@ function EmailEditor({
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button
             onClick={save}
-            disabled={mutation.isPending}
+            disabled={disabled || mutation.isPending}
             className="gap-2"
           >
             <HugeiconsIcon icon={SaveIcon} />
@@ -399,6 +477,7 @@ function EmailEditor({
           <Button
             variant="outline"
             onClick={openGmail}
+            disabled={disabled}
             className="gap-2"
           >
             <HugeiconsIcon icon={Mail01Icon} />
@@ -414,10 +493,12 @@ function ApplicationEditor({
   application,
   queryKey,
   userId,
+  disabled = false,
 }: {
   application: ApplicationDetail;
   queryKey: ApplicationQueryKey;
   userId: string;
+  disabled?: boolean;
 }) {
   const [vagaTitulo, setVagaTitulo] = useState(
     application.vaga_titulo ?? "",
@@ -457,6 +538,7 @@ function ApplicationEditor({
             id="application-title"
             value={vagaTitulo}
             onChange={(event) => setVagaTitulo(event.target.value)}
+            disabled={disabled}
             maxLength={200}
             placeholder="Ex.: Desenvolvedor Front-end"
           />
@@ -467,6 +549,7 @@ function ApplicationEditor({
             id="application-company"
             value={empresa}
             onChange={(event) => setEmpresa(event.target.value)}
+            disabled={disabled}
             maxLength={200}
             autoComplete="organization"
             placeholder="Ex.: Acme"
@@ -480,6 +563,7 @@ function ApplicationEditor({
           <Label htmlFor="application-status">Status</Label>
           <Select
             value={status}
+            disabled={disabled}
             onValueChange={(value) =>
               setStatus(value as ApplicationStatus)
             }
@@ -502,12 +586,13 @@ function ApplicationEditor({
             id="application-notes"
             value={notas}
             onChange={(event) => setNotas(event.target.value)}
+            disabled={disabled}
             maxLength={10_000}
             placeholder="Contatos, próximos passos, feedbacks..."
             className="min-h-40"
           />
         </div>
-        <Button onClick={save} disabled={mutation.isPending}>
+        <Button onClick={save} disabled={disabled || mutation.isPending}>
           {mutation.isPending ? "Salvando..." : "Salvar alterações"}
         </Button>
       </CardContent>
@@ -516,10 +601,14 @@ function ApplicationEditor({
 }
 
 export function ApplicationDetailView({ id }: { id: string }) {
+  const queryClient = useQueryClient();
   const { session, loading: sessionLoading, error: sessionError } =
     useAnonymousSession();
   const userId = session?.user.id;
-  const queryKey = ["application", userId ?? "sem-sessao", id] as const;
+  const queryKey = useMemo(
+    () => ["application", userId ?? "sem-sessao", id] as const,
+    [id, userId],
+  );
   const query = useQuery({
     queryKey,
     queryFn: () => fetchApplication(id),
@@ -530,10 +619,78 @@ export function ApplicationDetailView({ id }: { id: string }) {
     },
   });
   const application = query.data?.application;
+  const analysisStateQuery = useQuery({
+    queryKey: [...queryKey, "analysis-state"],
+    queryFn: () => fetchApplicationAnalysisState(id),
+    enabled: Boolean(userId && application?.analysis_status === "pending"),
+    refetchInterval(query) {
+      const state = query.state.data?.analysis;
+      const status = state?.analysis_status ?? application?.analysis_status;
+      const updatedAt = state?.updated_at ?? application?.updated_at;
+
+      return status === "pending" &&
+        updatedAt &&
+        isActiveReanalysis({ analysisStatus: status, updatedAt })
+        ? 3_000
+        : false;
+    },
+    refetchIntervalInBackground: true,
+    retry(failureCount, error) {
+      return !(error instanceof ApiError && error.status < 500) &&
+        failureCount < 1;
+    },
+  });
+  const [activeTab, setActiveTab] = useState("vaga");
+  const [localAnalysisPending, setLocalAnalysisPending] = useState(false);
+  const activeAnalysisPending = useActiveAnalysisPending(application);
+  const analysisPending = localAnalysisPending || activeAnalysisPending;
+  const observedAnalysisState = analysisStateQuery.data?.analysis;
+
+  useEffect(() => {
+    if (!application || !observedAnalysisState || !userId) return;
+
+    if (observedAnalysisState.analysis_status === "pending") {
+      if (
+        observedAnalysisState.retry_count !== application.retry_count ||
+        observedAnalysisState.updated_at !== application.updated_at ||
+        application.analysis_status !== "pending"
+      ) {
+        queryClient.setQueryData<ApplicationResponse>(queryKey, (current) =>
+          current
+            ? {
+                application: {
+                  ...current.application,
+                  ...observedAnalysisState,
+                },
+              }
+            : current,
+        );
+      }
+
+      return;
+    }
+
+    if (application.analysis_status === "pending") {
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey, exact: true }),
+        queryClient.invalidateQueries({
+          queryKey: userApplicationsKeys.byUser(userId),
+        }),
+      ]);
+    }
+  }, [
+    application,
+    observedAnalysisState,
+    queryClient,
+    queryKey,
+    userId,
+  ]);
 
   const visibleError =
     sessionError ??
-    (query.error instanceof Error ? query.error.message : null);
+    (!application && query.error instanceof Error
+      ? query.error.message
+      : null);
 
   return (
     <div>
@@ -567,19 +724,40 @@ export function ApplicationDetailView({ id }: { id: string }) {
               </h1>
               <p className="mt-2 text-muted-foreground">
                 {application.empresa || "Empresa não informada"} ·{" "}
-                {application.analysis_status === "nao_aplicavel"
-                  ? "Registrado em"
-                  : "Analisado em"}{" "}
+                Registrado em{" "}
                 {dateFormatter.format(new Date(application.created_at))}
               </p>
             </div>
-            <Badge variant="secondary" className="w-fit">
-              {applicationStatusLabels[application.status]}
-            </Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary" className="w-fit">
+                {applicationStatusLabels[application.status]}
+              </Badge>
+              <ApplicationReanalysisDialog
+                application={application}
+                userId={userId}
+                analysisPending={analysisPending}
+                onPendingChange={setLocalAnalysisPending}
+                onSuccess={() => setActiveTab("curriculo")}
+              />
+            </div>
           </header>
 
+          {application.analysis_status === "failed" && (
+            <Alert variant="destructive" className="mb-6">
+              <AlertTitle>A última análise não foi concluída</AlertTitle>
+              <AlertDescription>
+                {application.last_error ||
+                  "Seus materiais anteriores foram preservados. Tente gerar uma nova análise."}
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-            <Tabs defaultValue="vaga" className="min-w-0">
+            <Tabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className="min-w-0"
+            >
               <div className="overflow-x-auto pb-1">
                 <TabsList>
                   <TabsTrigger value="vaga">Vaga</TabsTrigger>
@@ -660,16 +838,20 @@ export function ApplicationDetailView({ id }: { id: string }) {
                     </CardContent>
                   </Card>
                   <CurriculumEditor
+                    key={`curriculum:${application.retry_count}:${application.analysis_status}`}
                     application={application}
                     queryKey={queryKey}
+                    disabled={analysisPending}
                   />
                 </div>
               </TabsContent>
 
               <TabsContent value="email">
                 <EmailEditor
+                  key={`email:${application.retry_count}:${application.analysis_status}`}
                   application={application}
                   queryKey={queryKey}
+                  disabled={analysisPending}
                 />
               </TabsContent>
 
@@ -681,10 +863,16 @@ export function ApplicationDetailView({ id }: { id: string }) {
             </Tabs>
 
             <ApplicationEditor
-              key={application.updated_at}
+              key={JSON.stringify([
+                application.vaga_titulo,
+                application.empresa,
+                application.status,
+                application.notas,
+              ])}
               application={application}
               queryKey={queryKey}
               userId={userId}
+              disabled={analysisPending}
             />
           </div>
         </>
