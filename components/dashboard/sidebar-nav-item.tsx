@@ -14,16 +14,20 @@ type SidebarNavItemProps = {
   href: string;
   icon: LucideIcon;
   label: string;
+  activePrefixes?: readonly string[];
 };
 
 export function SidebarNavItem({
   href,
   icon: Icon,
   label,
+  activePrefixes = [],
 }: SidebarNavItemProps) {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
-  const isActive = pathname === href;
+  const isActive =
+    pathname === href ||
+    activePrefixes.some((prefix) => pathname.startsWith(prefix));
 
   return (
     <SidebarMenuItem>

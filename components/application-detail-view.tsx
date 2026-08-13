@@ -536,7 +536,7 @@ export function ApplicationDetailView({ id }: { id: string }) {
     (query.error instanceof Error ? query.error.message : null);
 
   return (
-    <main className="container mx-auto max-w-7xl px-6 py-10">
+    <div>
       <Link
         href="/candidaturas"
         className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "mb-4")}
@@ -689,6 +689,6 @@ export function ApplicationDetailView({ id }: { id: string }) {
           </div>
         </>
       )}
-    </main>
+    </div>
   );
 }

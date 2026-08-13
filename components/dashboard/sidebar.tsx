@@ -22,7 +22,12 @@ import {
 const navigation = [
   { href: "/inicio", label: "Início", icon: Home },
   { href: "/nova-analise", label: "Nova análise", icon: Sparkles },
-  { href: "/candidaturas", label: "Candidaturas", icon: BriefcaseBusiness },
+  {
+    href: "/candidaturas",
+    label: "Candidaturas",
+    icon: BriefcaseBusiness,
+    activePrefixes: ["/historico/"],
+  },
 ] as const;
 
 export function Sidebar() {

@@ -10,12 +10,20 @@ const DASHBOARD_ROUTES = new Set([
   "/nova-analise",
   "/candidaturas",
 ]);
+const DASHBOARD_ROUTE_PREFIXES = ["/historico/"] as const;
+
+function isDashboardRoute(pathname: string) {
+  return (
+    DASHBOARD_ROUTES.has(pathname) ||
+    DASHBOARD_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+  );
+}
 
 export function SiteHeader() {
   const pathname = usePathname();
   const { isAnonymous, loading } = useAnonymousSession();
 
-  if (DASHBOARD_ROUTES.has(pathname)) {
+  if (isDashboardRoute(pathname)) {
     return null;
   }
 
