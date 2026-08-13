@@ -11,6 +11,7 @@ import {
   REANALYSIS_MAX_DESCRIPTION_LENGTH,
   REANALYSIS_MAX_REQUEST_SIZE,
 } from "@/lib/application-reanalysis";
+import { normalizeSkillTags } from "@/lib/application-job-details";
 import { classifyCurriculumFile } from "@/lib/curriculum-files";
 import { formatOutreachEmail } from "@/lib/email-utils";
 import {
@@ -566,11 +567,17 @@ export async function POST(
     }
 
     claimedRetryCount = claimedApplication.retry_count;
+    const storedMissingSkills = normalizeSkillTags(
+      application.skills_nao_dominadas ?? [],
+    );
 
     const { result } = await analyzeWithGemini(
       {
         vagaTitulo: application.vaga_titulo ?? "",
         empresa: application.empresa ?? "",
+        salario: application.salario,
+        modeloContratacao: application.modelo_contratacao,
+        skillsNaoDominadas: storedMissingSkills,
         description,
         curriculum,
       },
@@ -591,6 +598,13 @@ export async function POST(
       subject: result.email.assunto,
       body: result.email.corpo,
     });
+    const resolvedSalary = application.salario?.trim() || result.salario;
+    const resolvedHiringModel =
+      application.modelo_contratacao ?? result.modeloContratacao;
+    const resolvedMissingSkills =
+      storedMissingSkills.length > 0
+        ? storedMissingSkills
+        : result.skillsNaoDominadas;
 
     if (replacesCurriculum && curriculum.kind === "pdf") {
       uploadedCurriculumPath = `${user.id}/${application.id}/${randomUUID()}.pdf`;
@@ -622,6 +636,9 @@ export async function POST(
         curriculo_otimizado: result.curriculoMarkdown,
         email_outreach: outreachEmail,
         carta_apresentacao: result.cartaApresentacao,
+        salario: resolvedSalary,
+        modelo_contratacao: resolvedHiringModel,
+        skills_nao_dominadas: resolvedMissingSkills,
         ...(replacesCurriculum && {
           curriculo_input_kind: curriculum.kind,
           curriculo_arquivo_nome:

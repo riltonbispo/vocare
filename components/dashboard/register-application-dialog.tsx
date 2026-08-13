@@ -8,6 +8,7 @@ import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { TagsInput } from "@/components/tags-input";
 import {
   Dialog,
   DialogContent,
@@ -17,7 +18,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -34,9 +40,16 @@ import {
   APPLICATION_NOTES_MAX_LENGTH,
   APPLICATION_TITLE_MAX_LENGTH,
   quickApplicationSchema,
+  type QuickApplicationFormInput,
   type QuickApplicationInput,
 } from "@/lib/application-registration";
 import { APPLICATION_STATUSES } from "@/lib/applications";
+import {
+  APPLICATION_SALARY_MAX_LENGTH,
+  HIRING_MODELS,
+} from "@/lib/application-job-details";
+
+const NO_HIRING_MODEL = "not-informed";
 
 type RegisterApplicationDialogProps = {
   userId: string | null;
@@ -50,6 +63,9 @@ const defaultValues: QuickApplicationInput = {
   status: "aplicado",
   descricao_vaga: "",
   notas: "",
+  salario: "",
+  modelo_contratacao: undefined,
+  skills_nao_dominadas: [],
 };
 
 async function createApplication(input: QuickApplicationInput) {
@@ -80,7 +96,11 @@ export function RegisterApplicationDialog({
     handleSubmit,
     register,
     reset,
-  } = useForm<QuickApplicationInput>({
+  } = useForm<
+    QuickApplicationFormInput,
+    unknown,
+    QuickApplicationInput
+  >({
     resolver: zodResolver(quickApplicationSchema),
     defaultValues,
   });
@@ -244,6 +264,112 @@ export function RegisterApplicationDialog({
                 </Select>
                 <FieldError
                   id="quick-application-status-error"
+                  errors={[fieldState.error]}
+                />
+              </Field>
+            )}
+          />
+
+          <div className="grid gap-5 sm:grid-cols-2 sm:gap-4">
+            <Field data-invalid={Boolean(errors.salario)}>
+              <FieldLabel htmlFor="quick-application-salary">
+                Salário
+              </FieldLabel>
+              <Input
+                id="quick-application-salary"
+                placeholder="Ex.: R$ 8.000 a R$ 10.000"
+                maxLength={APPLICATION_SALARY_MAX_LENGTH}
+                disabled={formDisabled}
+                aria-invalid={Boolean(errors.salario)}
+                aria-describedby={
+                  errors.salario ? "quick-application-salary-error" : undefined
+                }
+                {...register("salario")}
+              />
+              <FieldError
+                id="quick-application-salary-error"
+                errors={[errors.salario]}
+              />
+            </Field>
+
+            <Controller
+              name="modelo_contratacao"
+              control={control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="quick-application-hiring-model">
+                    Modelo de contratação
+                  </FieldLabel>
+                  <Select
+                    name={field.name}
+                    value={field.value ?? NO_HIRING_MODEL}
+                    disabled={formDisabled}
+                    onValueChange={(value) =>
+                      field.onChange(
+                        value === NO_HIRING_MODEL ? undefined : value,
+                      )
+                    }
+                  >
+                    <SelectTrigger
+                      id="quick-application-hiring-model"
+                      className="w-full"
+                      aria-invalid={fieldState.invalid}
+                      aria-describedby={
+                        fieldState.error
+                          ? "quick-application-hiring-model-error"
+                          : undefined
+                      }
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NO_HIRING_MODEL}>
+                        Não informado
+                      </SelectItem>
+                      {HIRING_MODELS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldError
+                    id="quick-application-hiring-model-error"
+                    errors={[fieldState.error]}
+                  />
+                </Field>
+              )}
+            />
+          </div>
+
+          <Controller
+            name="skills_nao_dominadas"
+            control={control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor="quick-application-missing-skills">
+                  Skills que você ainda não domina
+                </FieldLabel>
+                <TagsInput
+                  id="quick-application-missing-skills"
+                  ref={field.ref}
+                  value={field.value ?? []}
+                  onValueChange={field.onChange}
+                  onBlur={field.onBlur}
+                  disabled={formDisabled}
+                  placeholder="Ex.: Kubernetes"
+                  aria-invalid={fieldState.invalid}
+                  aria-describedby={
+                    fieldState.error
+                      ? "quick-application-missing-skills-help quick-application-missing-skills-error"
+                      : "quick-application-missing-skills-help"
+                  }
+                />
+                <FieldDescription id="quick-application-missing-skills-help">
+                  Digite uma skill e pressione Enter ou vírgula.
+                </FieldDescription>
+                <FieldError
+                  id="quick-application-missing-skills-error"
                   errors={[fieldState.error]}
                 />
               </Field>

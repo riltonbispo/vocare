@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { APPLICATION_STATUSES } from "@/lib/applications";
+import { applicationJobDetailsSchema } from "@/lib/application-job-details";
 import type { ApplicationStatus } from "@/lib/supabase/database.types";
 
 export const APPLICATION_TITLE_MAX_LENGTH = 200;
@@ -47,7 +48,11 @@ export const quickApplicationSchema = z
         `As observações devem ter no máximo ${APPLICATION_NOTES_MAX_LENGTH} caracteres.`,
       )
       .optional(),
+    ...applicationJobDetailsSchema.shape,
   })
   .strict();
 
-export type QuickApplicationInput = z.infer<typeof quickApplicationSchema>;
+export type QuickApplicationFormInput = z.input<
+  typeof quickApplicationSchema
+>;
+export type QuickApplicationInput = z.output<typeof quickApplicationSchema>;

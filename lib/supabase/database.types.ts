@@ -21,6 +21,14 @@ export type AnalysisStatus =
 
 export type CurriculumInputKind = "text" | "pdf";
 
+export type HiringModel =
+  | "clt"
+  | "pj"
+  | "freelancer"
+  | "estagio"
+  | "temporario"
+  | "outro";
+
 export type Database = {
   public: {
     Tables: {
@@ -108,8 +116,11 @@ export type Database = {
           email_outreach: string | null;
           error_code: string | null;
           last_error: string | null;
+          modelo_contratacao: HiringModel | null;
           notas: string | null;
           retry_count: number;
+          salario: string | null;
+          skills_nao_dominadas: string[] | null;
           status: ApplicationStatus;
           created_at: string;
           updated_at: string;
@@ -131,8 +142,11 @@ export type Database = {
           email_outreach?: string | null;
           error_code?: string | null;
           last_error?: string | null;
+          modelo_contratacao?: HiringModel | null;
           notas?: string | null;
           retry_count?: number;
+          salario?: string | null;
+          skills_nao_dominadas?: string[] | null;
           status?: ApplicationStatus;
           created_at?: string;
           updated_at?: string;
@@ -154,8 +168,11 @@ export type Database = {
           email_outreach?: string | null;
           error_code?: string | null;
           last_error?: string | null;
+          modelo_contratacao?: HiringModel | null;
           notas?: string | null;
           retry_count?: number;
+          salario?: string | null;
+          skills_nao_dominadas?: string[] | null;
           status?: ApplicationStatus;
           created_at?: string;
           updated_at?: string;
@@ -174,7 +191,9 @@ export type Database = {
         Returns: string;
       };
     };
-    Enums: Record<never, never>;
+    Enums: {
+      hiring_model: HiringModel;
+    };
     CompositeTypes: Record<never, never>;
   };
 };

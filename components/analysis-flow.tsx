@@ -6,6 +6,7 @@ import { SparklesIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
 import { AnalysisResults } from "@/components/analysis-results";
+import { TagsInput } from "@/components/tags-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,12 +18,26 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAnonymousSession } from "@/hooks/use-anonymous-session";
 import {
   classifyCurriculumFile,
   CURRICULUM_FILE_ACCEPT,
 } from "@/lib/curriculum-files";
+import {
+  APPLICATION_SALARY_MAX_LENGTH,
+  HIRING_MODELS,
+} from "@/lib/application-job-details";
+import type { HiringModel } from "@/lib/supabase/database.types";
+
+const NO_HIRING_MODEL = "not-informed";
 
 interface AnalysisResult {
   curriculum: string;
@@ -33,6 +48,9 @@ interface AnalysisResult {
   recruiterEmail: string | null;
   vagaTitulo: string | null;
   empresa: string | null;
+  salario: string | null;
+  modeloContratacao: HiringModel | null;
+  skillsNaoDominadas: string[];
 }
 
 export function AnalysisFlow() {
@@ -44,6 +62,10 @@ export function AnalysisFlow() {
   } = useAnonymousSession();
   const [vagaTitulo, setVagaTitulo] = useState("");
   const [empresa, setEmpresa] = useState("");
+  const [salario, setSalario] = useState("");
+  const [modeloContratacao, setModeloContratacao] =
+    useState<HiringModel | null>(null);
+  const [skillsNaoDominadas, setSkillsNaoDominadas] = useState<string[]>([]);
   const [description, setDescription] = useState("");
   const [curriculum, setCurriculum] = useState("");
   const [curriculumFile, setCurriculumFile] = useState<File | null>(null);
@@ -108,6 +130,15 @@ export function AnalysisFlow() {
       formData.append("empresa", empresa);
       formData.append("description", description);
       formData.append("curriculum", curriculum);
+      formData.append("salario", salario);
+
+      if (modeloContratacao) {
+        formData.append("modelo_contratacao", modeloContratacao);
+      }
+
+      for (const skill of skillsNaoDominadas) {
+        formData.append("skills_nao_dominadas", skill);
+      }
 
       if (curriculumFile) {
         formData.append("curriculumFile", curriculumFile);
@@ -126,6 +157,9 @@ export function AnalysisFlow() {
               empresa,
               description,
               curriculum,
+              salario,
+              modelo_contratacao: modeloContratacao ?? undefined,
+              skills_nao_dominadas: skillsNaoDominadas,
             }),
           });
 
@@ -138,6 +172,13 @@ export function AnalysisFlow() {
       setResult(data);
       setVagaTitulo((current) => current.trim() || data.vagaTitulo || "");
       setEmpresa((current) => current.trim() || data.empresa || "");
+      setSalario((current) => current.trim() || data.salario || "");
+      setModeloContratacao(
+        (current) => current ?? data.modeloContratacao,
+      );
+      setSkillsNaoDominadas((current) =>
+        current.length > 0 ? current : data.skillsNaoDominadas,
+      );
       void queryClient.invalidateQueries({
         queryKey: ["user-applications", session.user.id],
       });
@@ -189,6 +230,69 @@ export function AnalysisFlow() {
           />
           <p className="text-xs text-muted-foreground">
             Se ficar vazio, será identificado pela descrição.
+          </p>
+        </div>
+      </div>
+
+      <div className="mb-6 grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-2">
+          <Label htmlFor="salario">Salário (opcional)</Label>
+          <Input
+            id="salario"
+            value={salario}
+            onChange={(event) => setSalario(event.target.value)}
+            maxLength={APPLICATION_SALARY_MAX_LENGTH}
+            placeholder="Ex.: R$ 8.000 a R$ 10.000"
+          />
+          <p className="text-xs text-muted-foreground">
+            Se ficar vazio, será identificado pela descrição.
+          </p>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="modelo-contratacao">
+            Modelo de contratação (opcional)
+          </Label>
+          <Select
+            value={modeloContratacao ?? NO_HIRING_MODEL}
+            onValueChange={(value) =>
+              setModeloContratacao(
+                value === NO_HIRING_MODEL ? null : (value as HiringModel),
+              )
+            }
+          >
+            <SelectTrigger id="modelo-contratacao" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_HIRING_MODEL}>Não informado</SelectItem>
+              {HIRING_MODELS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            Se ficar vazio, será identificado pela descrição.
+          </p>
+        </div>
+        <div className="grid gap-2 sm:col-span-2">
+          <Label htmlFor="skills-nao-dominadas">
+            Skills que você ainda não domina (opcional)
+          </Label>
+          <TagsInput
+            id="skills-nao-dominadas"
+            value={skillsNaoDominadas}
+            onValueChange={setSkillsNaoDominadas}
+            placeholder="Ex.: Kubernetes"
+            aria-describedby="skills-nao-dominadas-help"
+          />
+          <p
+            id="skills-nao-dominadas-help"
+            className="text-xs text-muted-foreground"
+          >
+            Digite uma skill e pressione Enter ou vírgula. Se ficar vazio, a
+            IA identificará requisitos da vaga sem evidência no currículo.
           </p>
         </div>
       </div>

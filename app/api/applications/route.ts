@@ -52,6 +52,9 @@ export async function POST(request: NextRequest) {
       analysis_status: "nao_aplicavel",
       descricao_vaga: optionalText(parsedBody.data.descricao_vaga),
       notas: optionalText(parsedBody.data.notas),
+      salario: optionalText(parsedBody.data.salario),
+      modelo_contratacao: parsedBody.data.modelo_contratacao ?? null,
+      skills_nao_dominadas: parsedBody.data.skills_nao_dominadas,
     })
     .select("*")
     .single();

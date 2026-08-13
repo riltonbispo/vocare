@@ -213,6 +213,9 @@ export default function CandidaturasPage() {
                 status={application.status}
                 createdAt={application.created_at}
                 analysisStatus={application.analysis_status}
+                salary={application.salario}
+                hiringModel={application.modelo_contratacao}
+                missingSkills={application.skills_nao_dominadas}
                 deleting={
                   deleteMutation.isPending &&
                   deleteMutation.variables?.id === application.id

@@ -3,10 +3,15 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  hiringModelLabels,
+  normalizeSkillTags,
+} from "@/lib/application-job-details";
 import { applicationStatusLabels } from "@/lib/applications";
 import type {
   AnalysisStatus,
   ApplicationStatus,
+  HiringModel,
 } from "@/lib/supabase/database.types";
 
 type ApplicationListItemProps = {
@@ -16,9 +21,14 @@ type ApplicationListItemProps = {
   status: ApplicationStatus;
   createdAt: string;
   analysisStatus?: AnalysisStatus;
+  salary?: string | null;
+  hiringModel?: HiringModel | null;
+  missingSkills?: string[] | null;
   onDelete?: () => void;
   deleting?: boolean;
 };
+
+const MAX_VISIBLE_MISSING_SKILLS = 3;
 
 const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
   day: "2-digit",
@@ -58,19 +68,46 @@ export function ApplicationListItem({
   status,
   createdAt,
   analysisStatus,
+  salary,
+  hiringModel,
+  missingSkills,
   onDelete,
   deleting = false,
 }: ApplicationListItemProps) {
   const statusPresentation = getStatusPresentation(status, analysisStatus);
   const isQuickRegistration = analysisStatus === "nao_aplicavel";
   const applicationTitle = title ?? "Vaga sem título";
+  const normalizedSalary = salary?.trim() ?? "";
+  const normalizedMissingSkills = normalizeSkillTags(missingSkills ?? []);
+  const visibleMissingSkills = normalizedMissingSkills.slice(
+    0,
+    MAX_VISIBLE_MISSING_SKILLS,
+  );
+  const hiddenMissingSkillsCount =
+    normalizedMissingSkills.length - visibleMissingSkills.length;
+  const hasJobDetails = Boolean(
+    normalizedSalary || hiringModel || normalizedMissingSkills.length,
+  );
+  const accessibilityDetails = [
+    `Ver detalhes de ${applicationTitle}`,
+    company ? `empresa ${company}` : "empresa não informada",
+    `status ${statusPresentation.label}`,
+    hiringModel ? `modelo ${hiringModelLabels[hiringModel]}` : null,
+    normalizedSalary ? "salário informado" : null,
+    normalizedMissingSkills.length > 0
+      ? `${normalizedMissingSkills.length} ${normalizedMissingSkills.length === 1 ? "skill não dominada" : "skills não dominadas"}`
+      : null,
+    isQuickRegistration ? "registro rápido sem análise" : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   return (
     <div className="flex min-w-0 items-center rounded-2xl border bg-card transition-colors hover:bg-muted/40">
       <Link
         href={`/historico/${id}`}
         className="group flex min-w-0 flex-1 items-center gap-3 rounded-2xl p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:gap-4 sm:p-4"
-        aria-label={`Ver detalhes de ${applicationTitle}, status ${statusPresentation.label}${isQuickRegistration ? ", registro rápido sem análise" : ""}`}
+        aria-label={accessibilityDetails}
       >
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium text-foreground">
@@ -79,6 +116,54 @@ export function ApplicationListItem({
           <p className="mt-1 truncate text-sm text-muted-foreground">
             {company ?? "Empresa não informada"}
           </p>
+          {hasJobDetails && (
+            <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
+              {hiringModel && (
+                <Badge
+                  variant="outline"
+                  className="border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900 dark:bg-violet-950/60 dark:text-violet-300"
+                >
+                  {hiringModelLabels[hiringModel]}
+                </Badge>
+              )}
+              {normalizedSalary && (
+                <Badge
+                  variant="outline"
+                  className="max-w-full border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300 sm:max-w-72"
+                  title={`Salário: ${normalizedSalary}`}
+                >
+                  <span className="shrink-0">Salário:</span>
+                  <span className="min-w-0 truncate">{normalizedSalary}</span>
+                </Badge>
+              )}
+              {normalizedMissingSkills.length > 0 && (
+                <>
+                  <span className="text-xs font-medium text-red-700 dark:text-red-300">
+                    Não domina:
+                  </span>
+                  {visibleMissingSkills.map((skill) => (
+                    <Badge
+                      key={skill.toLocaleLowerCase("pt-BR")}
+                      variant="outline"
+                      className="max-w-full border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/60 dark:text-red-300 sm:max-w-48"
+                      title={`Skill não dominada: ${skill}`}
+                    >
+                      <span className="min-w-0 truncate">{skill}</span>
+                    </Badge>
+                  ))}
+                  {hiddenMissingSkillsCount > 0 && (
+                    <Badge
+                      variant="outline"
+                      className="border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/60 dark:text-red-300"
+                      title={`${hiddenMissingSkillsCount} ${hiddenMissingSkillsCount === 1 ? "skill adicional" : "skills adicionais"}`}
+                    >
+                      +{hiddenMissingSkillsCount}
+                    </Badge>
+                  )}
+                </>
+              )}
+            </div>
+          )}
           <div className="mt-1 flex flex-wrap items-center gap-1.5 sm:hidden">
             <Badge className={statusPresentation.className}>
               {statusPresentation.label}

@@ -3,6 +3,11 @@ import { z } from "zod";
 
 import { APPLICATION_STATUSES } from "@/lib/applications";
 import { ORIGINAL_CURRICULUM_BUCKET } from "@/lib/application-reanalysis";
+import {
+  hiringModelSchema,
+  salarySchema,
+  skillsNotMasteredSchema,
+} from "@/lib/application-job-details";
 import type { ApplicationStatus } from "@/lib/supabase/database.types";
 import { createClient } from "@/lib/supabase/server";
 
@@ -17,25 +22,15 @@ const updateSchema = z
     empresa: z.string().max(200).nullable().optional(),
     curriculo_otimizado: z.string().max(500_000).nullable().optional(),
     email_outreach: z.string().max(100_000).nullable().optional(),
+    salario: salarySchema.nullable().optional(),
+    modelo_contratacao: hiringModelSchema.nullable().optional(),
+    skills_nao_dominadas: skillsNotMasteredSchema.nullable().optional(),
     status: z.enum(statusValues).optional(),
     notas: z.string().max(10_000).nullable().optional(),
   })
   .strict()
   .refine(
-    ({
-      vaga_titulo,
-      empresa,
-      curriculo_otimizado,
-      email_outreach,
-      status,
-      notas,
-    }) =>
-      vaga_titulo !== undefined ||
-      empresa !== undefined ||
-      curriculo_otimizado !== undefined ||
-      email_outreach !== undefined ||
-      status !== undefined ||
-      notas !== undefined,
+    (update) => Object.values(update).some((value) => value !== undefined),
     "Informe ao menos um campo para atualizar.",
   );
 
@@ -152,6 +147,15 @@ export async function PATCH(
     }),
     ...(parsedBody.data.email_outreach !== undefined && {
       email_outreach: parsedBody.data.email_outreach?.trim() || null,
+    }),
+    ...(parsedBody.data.salario !== undefined && {
+      salario: parsedBody.data.salario?.trim() || null,
+    }),
+    ...(parsedBody.data.modelo_contratacao !== undefined && {
+      modelo_contratacao: parsedBody.data.modelo_contratacao,
+    }),
+    ...(parsedBody.data.skills_nao_dominadas !== undefined && {
+      skills_nao_dominadas: parsedBody.data.skills_nao_dominadas,
     }),
     ...(parsedBody.data.status !== undefined && {
       status: parsedBody.data.status,

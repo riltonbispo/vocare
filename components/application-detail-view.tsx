@@ -38,6 +38,7 @@ import { userApplicationsKeys } from "@/hooks/use-user-applications";
 import { ApplicationChannelsField } from "@/components/application-channels-field";
 import { ApplicationCoverLetter } from "@/components/application-cover-letter";
 import { ApplicationReanalysisDialog } from "@/components/application-reanalysis-dialog";
+import { TagsInput } from "@/components/tags-input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -66,6 +67,15 @@ import {
 } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import {
+  APPLICATION_SALARY_MAX_LENGTH,
+  HIRING_MODELS,
+  hiringModelLabels,
+  normalizeSkillTags,
+} from "@/lib/application-job-details";
+import type { HiringModel } from "@/lib/supabase/database.types";
+
+const NO_HIRING_MODEL = "not-informed";
 
 const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
   dateStyle: "long",
@@ -135,6 +145,9 @@ type ApplicationUpdate = Partial<
     | "empresa"
     | "curriculo_otimizado"
     | "email_outreach"
+    | "salario"
+    | "modelo_contratacao"
+    | "skills_nao_dominadas"
     | "status"
     | "notas"
   >
@@ -195,6 +208,7 @@ function useApplicationUpdate(
   id: string,
   queryKey: ApplicationQueryKey,
   successMessage: string,
+  userApplicationsUserId?: string,
 ) {
   const queryClient = useQueryClient();
 
@@ -235,6 +249,11 @@ function useApplicationUpdate(
     },
     onSettled() {
       void queryClient.invalidateQueries({ queryKey });
+      if (userApplicationsUserId) {
+        void queryClient.invalidateQueries({
+          queryKey: userApplicationsKeys.byUser(userApplicationsUserId),
+        });
+      }
     },
   });
 }
@@ -244,6 +263,76 @@ function EmptySection({ children }: { children: string }) {
     <p className="rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
       {children}
     </p>
+  );
+}
+
+function ApplicationJobDetails({
+  application,
+}: {
+  application: ApplicationDetail;
+}) {
+  const salary = application.salario?.trim() ?? "";
+  const hiringModel = application.modelo_contratacao;
+  const missingSkills = normalizeSkillTags(
+    application.skills_nao_dominadas ?? [],
+  );
+
+  if (!salary && !hiringModel && missingSkills.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Informações da vaga</CardTitle>
+        <CardDescription>
+          Condições e gaps registrados para esta oportunidade.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-5">
+        {(salary || hiringModel) && (
+          <dl className="grid gap-4 sm:grid-cols-2">
+            {salary && (
+              <div>
+                <dt className="text-sm text-muted-foreground">Salário</dt>
+                <dd className="mt-1 min-w-0 break-words font-medium">
+                  {salary}
+                </dd>
+              </div>
+            )}
+            {hiringModel && (
+              <div>
+                <dt className="text-sm text-muted-foreground">
+                  Modelo de contratação
+                </dt>
+                <dd className="mt-1">
+                  <Badge variant="secondary">
+                    {hiringModelLabels[hiringModel]}
+                  </Badge>
+                </dd>
+              </div>
+            )}
+          </dl>
+        )}
+
+        {missingSkills.length > 0 && (
+          <div>
+            <p className="text-sm text-muted-foreground">
+              Skills que você ainda não domina
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {missingSkills.map((skill) => (
+                <Badge
+                  key={skill.toLocaleLowerCase("pt-BR")}
+                  variant="outline"
+                  className="h-auto max-w-full whitespace-normal"
+                >
+                  <span className="break-all">{skill}</span>
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -504,6 +593,12 @@ function ApplicationEditor({
     application.vaga_titulo ?? "",
   );
   const [empresa, setEmpresa] = useState(application.empresa ?? "");
+  const [salario, setSalario] = useState(application.salario ?? "");
+  const [modeloContratacao, setModeloContratacao] =
+    useState<HiringModel | null>(application.modelo_contratacao);
+  const [skillsNaoDominadas, setSkillsNaoDominadas] = useState(
+    normalizeSkillTags(application.skills_nao_dominadas ?? []),
+  );
   const [status, setStatus] = useState<ApplicationStatus>(
     application.status,
   );
@@ -512,12 +607,16 @@ function ApplicationEditor({
     application.id,
     queryKey,
     "Candidatura atualizada.",
+    userId,
   );
 
   function save() {
     mutation.mutate({
       vaga_titulo: vagaTitulo.trim() || null,
       empresa: empresa.trim() || null,
+      salario: salario.trim() || null,
+      modelo_contratacao: modeloContratacao,
+      skills_nao_dominadas: skillsNaoDominadas,
       status,
       notas: notas.trim() || null,
     });
@@ -554,6 +653,62 @@ function ApplicationEditor({
             autoComplete="organization"
             placeholder="Ex.: Acme"
           />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="application-salary">Salário</Label>
+          <Input
+            id="application-salary"
+            value={salario}
+            onChange={(event) => setSalario(event.target.value)}
+            disabled={disabled}
+            maxLength={APPLICATION_SALARY_MAX_LENGTH}
+            placeholder="Ex.: R$ 8.000 a R$ 10.000"
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="application-hiring-model">
+            Modelo de contratação
+          </Label>
+          <Select
+            value={modeloContratacao ?? NO_HIRING_MODEL}
+            disabled={disabled}
+            onValueChange={(value) =>
+              setModeloContratacao(
+                value === NO_HIRING_MODEL ? null : (value as HiringModel),
+              )
+            }
+          >
+            <SelectTrigger id="application-hiring-model" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NO_HIRING_MODEL}>Não informado</SelectItem>
+              {HIRING_MODELS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="application-missing-skills">
+            Skills que você ainda não domina
+          </Label>
+          <TagsInput
+            id="application-missing-skills"
+            value={skillsNaoDominadas}
+            onValueChange={setSkillsNaoDominadas}
+            disabled={disabled}
+            placeholder="Ex.: Kubernetes"
+            aria-describedby="application-missing-skills-help"
+          />
+          <p
+            id="application-missing-skills-help"
+            className="text-xs text-muted-foreground"
+          >
+            Digite uma skill e pressione Enter ou vírgula.
+          </p>
         </div>
         <ApplicationChannelsField
           applicationId={application.id}
@@ -768,27 +923,30 @@ export function ApplicationDetailView({ id }: { id: string }) {
               </div>
 
               <TabsContent value="vaga">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Descrição da vaga</CardTitle>
-                    <CardDescription>
-                      {application.analysis_status === "nao_aplicavel"
-                        ? "Descrição ou link informado no registro."
-                        : "Texto original usado na análise."}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {application.descricao_vaga ? (
-                      <div className="whitespace-pre-wrap leading-7">
-                        {application.descricao_vaga}
-                      </div>
-                    ) : (
-                      <EmptySection>
-                        A descrição da vaga não foi salva neste registro.
-                      </EmptySection>
-                    )}
-                  </CardContent>
-                </Card>
+                <div className="grid gap-6">
+                  <ApplicationJobDetails application={application} />
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Descrição da vaga</CardTitle>
+                      <CardDescription>
+                        {application.analysis_status === "nao_aplicavel"
+                          ? "Descrição ou link informado no registro."
+                          : "Texto original usado na análise."}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {application.descricao_vaga ? (
+                        <div className="whitespace-pre-wrap leading-7">
+                          {application.descricao_vaga}
+                        </div>
+                      ) : (
+                        <EmptySection>
+                          A descrição da vaga não foi salva neste registro.
+                        </EmptySection>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
               </TabsContent>
 
               <TabsContent value="curriculo">
@@ -866,6 +1024,9 @@ export function ApplicationDetailView({ id }: { id: string }) {
               key={JSON.stringify([
                 application.vaga_titulo,
                 application.empresa,
+                application.salario,
+                application.modelo_contratacao,
+                application.skills_nao_dominadas,
                 application.status,
                 application.notas,
               ])}

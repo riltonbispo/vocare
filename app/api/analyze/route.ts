@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { applicationJobDetailsSchema } from "@/lib/application-job-details";
 import { extractEmailFromText } from "@/lib/email-utils";
 import {
   analyzeWithGemini,
@@ -8,6 +9,7 @@ import {
 } from "@/lib/gemini/analyze";
 import { createClient as createSupabaseClient } from "@/lib/supabase/server";
 import { classifyCurriculumFile } from "@/lib/curriculum-files";
+import type { HiringModel } from "@/lib/supabase/database.types";
 
 const MAX_CURRICULUM_FILE_SIZE = 10 * 1024 * 1024;
 const RETRYABLE_GEMINI_STATUSES = new Set([
@@ -15,6 +17,18 @@ const RETRYABLE_GEMINI_STATUSES = new Set([
 ]);
 
 class BadRequestError extends Error {}
+
+function parseJobDetails(input: unknown) {
+  const parsed = applicationJobDetailsSchema.safeParse(input);
+
+  if (!parsed.success) {
+    throw new BadRequestError(
+      parsed.error.issues[0]?.message ?? "Dados da vaga inválidos.",
+    );
+  }
+
+  return parsed.data;
+}
 
 async function readCurriculumFile(file: File): Promise<CurriculumInput> {
   if (file.size > MAX_CURRICULUM_FILE_SIZE) {
@@ -49,6 +63,17 @@ async function parseAnalysisRequest(req: NextRequest) {
     const description = formData.get("description");
     const curriculum = formData.get("curriculum");
     const curriculumFile = formData.get("curriculumFile");
+    const salario = formData.get("salario");
+    const modeloContratacao = formData.get("modelo_contratacao");
+    const skillsNaoDominadas = formData.getAll("skills_nao_dominadas");
+    const jobDetails = parseJobDetails({
+      salario: typeof salario === "string" ? salario : undefined,
+      modelo_contratacao:
+        typeof modeloContratacao === "string" && modeloContratacao
+          ? modeloContratacao
+          : undefined,
+      skills_nao_dominadas: skillsNaoDominadas,
+    });
 
     return {
       vagaTitulo: typeof vagaTitulo === "string" ? vagaTitulo : "",
@@ -61,25 +86,40 @@ async function parseAnalysisRequest(req: NextRequest) {
               kind: "text" as const,
               content: typeof curriculum === "string" ? curriculum : "",
             },
+      ...jobDetails,
     };
   }
 
-  const body = await req.json();
+  const body = (await req.json()) as unknown;
+
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    throw new BadRequestError("JSON inválido.");
+  }
+
+  const rawBody = body as Record<string, unknown>;
+  const jobDetails = parseJobDetails({
+    salario: rawBody.salario,
+    modelo_contratacao: rawBody.modelo_contratacao,
+    skills_nao_dominadas: rawBody.skills_nao_dominadas,
+  });
 
   return {
-    vagaTitulo: typeof body.vagaTitulo === "string" ? body.vagaTitulo : "",
-    empresa: typeof body.empresa === "string" ? body.empresa : "",
-    description: typeof body.description === "string" ? body.description : "",
+    vagaTitulo:
+      typeof rawBody.vagaTitulo === "string" ? rawBody.vagaTitulo : "",
+    empresa: typeof rawBody.empresa === "string" ? rawBody.empresa : "",
+    description:
+      typeof rawBody.description === "string" ? rawBody.description : "",
     curriculum: {
       kind: "text" as const,
-      content: typeof body.curriculum === "string" ? body.curriculum : "",
+      content:
+        typeof rawBody.curriculum === "string" ? rawBody.curriculum : "",
     },
+    ...jobDetails,
   };
 }
 
-function optionalText(value: string) {
-  const normalized = value.replace(/\s+/g, " ").trim();
-  return normalized || null;
+function optionalText(value: string | null | undefined) {
+  return value?.trim() || null;
 }
 
 function hasCurriculum(curriculum: CurriculumInput) {
@@ -104,6 +144,9 @@ async function saveCandidatura({
   optimizedCurriculum,
   outreachEmail,
   cartaApresentacao,
+  salario,
+  modeloContratacao,
+  skillsNaoDominadas,
 }: {
   vagaTitulo: string | null;
   empresa: string | null;
@@ -112,6 +155,9 @@ async function saveCandidatura({
   optimizedCurriculum: string;
   outreachEmail: string;
   cartaApresentacao: string;
+  salario: string | null;
+  modeloContratacao: HiringModel | null;
+  skillsNaoDominadas: string[];
 }) {
   try {
     const supabase = await createSupabaseClient();
@@ -138,6 +184,9 @@ async function saveCandidatura({
       curriculo_otimizado: optimizedCurriculum,
       email_outreach: outreachEmail,
       carta_apresentacao: cartaApresentacao,
+      salario,
+      modelo_contratacao: modeloContratacao,
+      skills_nao_dominadas: skillsNaoDominadas,
     });
 
     if (insertError) {
@@ -157,8 +206,15 @@ async function saveCandidatura({
 
 export async function POST(req: NextRequest) {
   try {
-    const { vagaTitulo, empresa, description, curriculum } =
-      await parseAnalysisRequest(req);
+    const {
+      vagaTitulo,
+      empresa,
+      description,
+      curriculum,
+      salario,
+      modelo_contratacao: modeloContratacao,
+      skills_nao_dominadas: skillsNaoDominadas,
+    } = await parseAnalysisRequest(req);
 
     if (!description.trim() || !hasCurriculum(curriculum)) {
       return NextResponse.json(
@@ -171,6 +227,9 @@ export async function POST(req: NextRequest) {
       {
         vagaTitulo,
         empresa,
+        salario: optionalText(salario),
+        modeloContratacao: modeloContratacao ?? null,
+        skillsNaoDominadas,
         description,
         curriculum,
       },
@@ -185,6 +244,14 @@ export async function POST(req: NextRequest) {
       optionalText(vagaTitulo) ?? optionalText(result.vagaTitulo);
     const resolvedCompany =
       optionalText(empresa) ?? optionalText(result.empresa);
+    const resolvedSalary =
+      optionalText(salario) ?? optionalText(result.salario);
+    const resolvedHiringModel =
+      modeloContratacao ?? result.modeloContratacao;
+    const resolvedMissingSkills =
+      skillsNaoDominadas.length > 0
+        ? skillsNaoDominadas
+        : result.skillsNaoDominadas;
     const originalCurriculum =
       curriculum.kind === "pdf"
         ? result.curriculoOriginalTexto.trim()
@@ -200,6 +267,9 @@ export async function POST(req: NextRequest) {
       optimizedCurriculum: result.curriculoMarkdown,
       outreachEmail,
       cartaApresentacao: result.cartaApresentacao,
+      salario: resolvedSalary,
+      modeloContratacao: resolvedHiringModel,
+      skillsNaoDominadas: resolvedMissingSkills,
     });
 
     return NextResponse.json({
@@ -211,6 +281,9 @@ export async function POST(req: NextRequest) {
       recruiterEmail,
       vagaTitulo: resolvedJobTitle,
       empresa: resolvedCompany,
+      salario: resolvedSalary,
+      modeloContratacao: resolvedHiringModel,
+      skillsNaoDominadas: resolvedMissingSkills,
     });
   } catch (error) {
     if (error instanceof BadRequestError) {

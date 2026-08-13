@@ -1,7 +1,17 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, type Schema } from "@google/genai";
 import { z } from "zod";
 
+import {
+  APPLICATION_SALARY_MAX_LENGTH,
+  APPLICATION_SKILL_MAX_LENGTH,
+  APPLICATION_SKILLS_MAX_COUNT,
+  HIRING_MODEL_VALUES,
+  hiringModelSchema,
+  salarySchema,
+  skillsNotMasteredSchema,
+} from "@/lib/application-job-details";
 import { buildAnalysisPrompt } from "@/lib/prompts";
+import type { HiringModel } from "@/lib/supabase/database.types";
 
 const DEFAULT_GEMINI_MODELS = [
   "gemini-3.6-flash",
@@ -28,6 +38,31 @@ const analysisResponseSchema = {
       type: Type.STRING,
       description:
         "Nome da empresa contratante. Retorne uma string vazia quando não houver evidência suficiente.",
+    },
+    salario: {
+      type: Type.STRING,
+      nullable: true,
+      maxLength: String(APPLICATION_SALARY_MAX_LENGTH),
+      description:
+        "Salário ou faixa salarial explicitamente informado para a vaga, preservando moeda, período e qualificadores. Retorne null quando não houver evidência suficiente.",
+    },
+    modeloContratacao: {
+      type: Type.STRING,
+      format: "enum",
+      enum: [...HIRING_MODEL_VALUES],
+      nullable: true,
+      description:
+        "Modelo de contratação explícito da vaga. Retorne null quando estiver ausente ou ambíguo; não use outro como sinônimo de desconhecido.",
+    },
+    skillsNaoDominadas: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.STRING,
+        maxLength: String(APPLICATION_SKILL_MAX_LENGTH),
+      },
+      maxItems: String(APPLICATION_SKILLS_MAX_COUNT),
+      description:
+        "Skills técnicas explicitamente requeridas ou desejadas na vaga que não estão comprovadas no currículo. Retorne uma lista vazia quando não houver gaps confiáveis.",
     },
     curriculoOriginalTexto: {
       type: Type.STRING,
@@ -61,17 +96,23 @@ const analysisResponseSchema = {
   required: [
     "vagaTitulo",
     "empresa",
+    "salario",
+    "modeloContratacao",
+    "skillsNaoDominadas",
     "curriculoOriginalTexto",
     "curriculoMarkdown",
     "email",
     "cartaApresentacao",
   ],
-};
+} satisfies Schema;
 
 const analysisResultSchema = z
   .object({
     vagaTitulo: z.string().trim().max(180),
     empresa: z.string().trim().max(180),
+    salario: salarySchema.nullable().transform((value) => value || null),
+    modeloContratacao: hiringModelSchema.nullable(),
+    skillsNaoDominadas: skillsNotMasteredSchema,
     curriculoOriginalTexto: z.string().trim(),
     curriculoMarkdown: z.string().trim().min(100),
     email: z
@@ -104,6 +145,9 @@ type AnalyzeWithGeminiInput = {
   description: string;
   vagaTitulo: string;
   empresa: string;
+  salario: string | null;
+  modeloContratacao: HiringModel | null;
+  skillsNaoDominadas: string[];
   curriculum: CurriculumInput;
 };
 
@@ -272,6 +316,9 @@ function createRequestParts(input: AnalyzeWithGeminiInput) {
     description: input.description,
     vagaTitulo: input.vagaTitulo,
     empresa: input.empresa,
+    salario: input.salario,
+    modeloContratacao: input.modeloContratacao,
+    skillsNaoDominadas: input.skillsNaoDominadas,
     curriculumKind: input.curriculum.kind,
   });
   const parts: GeminiRequestPart[] = [{ text: prompt }];

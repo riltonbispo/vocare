@@ -19,6 +19,9 @@ export type UserApplication = Pick<
   | "empresa"
   | "status"
   | "analysis_status"
+  | "salario"
+  | "modelo_contratacao"
+  | "skills_nao_dominadas"
   | "created_at"
   | "updated_at"
 >;
@@ -61,7 +64,7 @@ export const userApplicationsKeys = {
 };
 
 const USER_APPLICATIONS_SELECT =
-  "id, vaga_titulo, empresa, status, analysis_status, created_at, updated_at" as const;
+  "id, vaga_titulo, empresa, status, analysis_status, salario, modelo_contratacao, skills_nao_dominadas, created_at, updated_at" as const;
 
 function normalizePageSize(pageSize: number | undefined) {
   if (pageSize === undefined || !Number.isFinite(pageSize)) {
