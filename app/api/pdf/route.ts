@@ -81,10 +81,10 @@ export async function POST(req: NextRequest) {
         : createResumePdf(payload.markdown);
     const pdfBuffer = await renderToBuffer(document);
 
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": "attachment; filename=\"" + filename + ".pdf\"",
+        "Content-Disposition": `attachment; filename="${filename}.pdf"`,
       },
     });
   } catch (error) {

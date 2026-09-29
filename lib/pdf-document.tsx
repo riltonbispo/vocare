@@ -134,19 +134,19 @@ function renderInline(tokens: Token[], keyPrefix: string): ReactNode[] {
       case "strong":
         return (
           <Text key={key} style={{ fontWeight: 700 }}>
-            {renderInline(token.tokens, key)}
+            {renderInline(token.tokens ?? [], key)}
           </Text>
         );
       case "em":
         return (
           <Text key={key} style={{ fontStyle: "italic" }}>
-            {renderInline(token.tokens, key)}
+            {renderInline(token.tokens ?? [], key)}
           </Text>
         );
       case "del":
         return (
           <Text key={key} style={{ textDecoration: "line-through" }}>
-            {renderInline(token.tokens, key)}
+            {renderInline(token.tokens ?? [], key)}
           </Text>
         );
       case "codespan":
@@ -158,7 +158,7 @@ function renderInline(tokens: Token[], keyPrefix: string): ReactNode[] {
       case "link":
         return (
           <Link key={key} src={token.href} style={styles.link}>
-            {renderInline(token.tokens, key)}
+            {renderInline(token.tokens ?? [], key)}
           </Link>
         );
       case "image":
@@ -196,7 +196,7 @@ function renderListItem(item: Tokens.ListItem, key: string): ReactNode[] {
     if (token.type === "paragraph") {
       return (
         <Text key={tokenKey} style={styles.listParagraph}>
-          {renderInline(token.tokens, tokenKey)}
+          {renderInline(token.tokens ?? [], tokenKey)}
         </Text>
       );
     }
@@ -271,24 +271,24 @@ function renderBlock(token: Token, key: string): ReactNode {
 
       return (
         <Text key={key} style={headingStyle} minPresenceAhead={12}>
-          {renderInline(token.tokens, key)}
+          {renderInline(token.tokens ?? [], key)}
         </Text>
       );
     }
     case "paragraph":
       return (
         <Text key={key} style={styles.paragraph}>
-          {renderInline(token.tokens, key)}
+          {renderInline(token.tokens ?? [], key)}
         </Text>
       );
     case "list":
-      return renderList(token, key);
+      return renderList(token as Tokens.List, key);
     case "hr":
       return <View key={key} style={styles.horizontalRule} />;
     case "blockquote":
       return (
         <View key={key} style={styles.blockquote}>
-          {renderBlocks(token.tokens, key)}
+          {renderBlocks(token.tokens ?? [], key)}
         </View>
       );
     case "code":
@@ -298,7 +298,7 @@ function renderBlock(token: Token, key: string): ReactNode {
         </Text>
       );
     case "table":
-      return renderTable(token, key);
+      return renderTable(token as Tokens.Table, key);
     case "html":
       return (
         <Text key={key} style={styles.paragraph}>
