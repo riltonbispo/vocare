@@ -1,5 +1,10 @@
+import { renderToBuffer } from "@react-pdf/renderer";
 import { NextRequest, NextResponse } from "next/server";
-import { buildCoverLetterHtml, buildResumeHtml } from "@/lib/pdf-template";
+
+import {
+  createCoverLetterPdf,
+  createResumePdf,
+} from "@/lib/pdf-document";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -26,8 +31,6 @@ function safeFilename(value: unknown, fallback: string) {
 }
 
 export async function POST(req: NextRequest) {
-  let browser: import("puppeteer-core").Browser | undefined;
-
   try {
     let body: unknown;
 
@@ -72,59 +75,20 @@ export async function POST(req: NextRequest) {
     const fallbackFilename =
       documentType === "cover-letter" ? "carta-de-apresentacao" : "curriculo";
     const filename = safeFilename(payload.filename, fallbackFilename);
-    const html =
+    const document =
       documentType === "cover-letter"
-        ? buildCoverLetterHtml(payload.markdown)
-        : buildResumeHtml(payload.markdown);
-    const isLocal = process.env.NODE_ENV === "development";
-
-    if (isLocal) {
-      // Dev: usa o puppeteer completo (Chromium próprio baixado localmente)
-      const puppeteer = await import("puppeteer");
-      browser = await puppeteer.launch({ headless: true });
-    } else {
-      // Produção/serverless: puppeteer-core + chromium otimizado pra Lambda
-      const puppeteer = await import("puppeteer-core");
-      const chromium = (await import("@sparticuz/chromium")).default;
-
-      browser = await puppeteer.launch({
-        args: await puppeteer.defaultArgs({
-          args: chromium.args,
-          headless: "shell",
-        }),
-        executablePath: await chromium.executablePath(),
-        headless: "shell",
-      });
-    }
-
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "load" });
-
-    const pdfBuffer = Buffer.from(
-      await page.pdf({
-        format: "A4",
-        printBackground: true,
-        margin: { top: "0px", bottom: "0px", left: "0px", right: "0px" },
-      })
-    );
+        ? createCoverLetterPdf(payload.markdown)
+        : createResumePdf(payload.markdown);
+    const pdfBuffer = await renderToBuffer(document);
 
     return new NextResponse(pdfBuffer, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${filename}.pdf"`,
+        "Content-Disposition": "attachment; filename=\"" + filename + ".pdf\"",
       },
     });
   } catch (error) {
     console.error(error);
-    return NextResponse.json(
-      { error: "Falha ao gerar PDF." },
-      { status: 500 }
-    );
-  } finally {
-    if (browser) {
-      await browser.close().catch((error) => {
-        console.error("Falha ao fechar o navegador do gerador de PDF.", error);
-      });
-    }
+    return NextResponse.json({ error: "Falha ao gerar PDF." }, { status: 500 });
   }
 }

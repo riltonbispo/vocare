@@ -29,7 +29,7 @@ Aplicação web para adaptar currículos a vagas específicas com IA. O usuário
 - Tailwind CSS 4
 - Gemini 3.5 Flash
 - Google Gen AI SDK e Zod
-- Puppeteer / Chromium para geração de PDF
+- React PDF para geração de PDF
 - shadcn/base-ui para componentes de interface
 - TanStack Query para queries e mutations no detalhe das candidaturas
 - Supabase Auth, Postgres e RLS
@@ -272,7 +272,7 @@ lib/
   application-channels.ts # tipos, limite e normalização dos nomes de canais
   email-utils.ts
   gemini/analyze.ts    # chamada estruturada única, retry e validação
-  pdf-template.ts
+  pdf-document.tsx
   prompts.ts
   supabase/           # clientes browser/server, proxy e tipos
   utils.ts
@@ -284,7 +284,7 @@ supabase/
 
 ## Observações
 
-- A geração de PDF usa `puppeteer` em desenvolvimento e `puppeteer-core` com `@sparticuz/chromium` em produção/serverless.
+- A geração de PDF usa React PDF no servidor, convertendo currículos em Markdown e cartas de apresentação diretamente para PDF.
 - PDFs são enviados diretamente ao Gemini na mesma operação que gera os
   resultados. A transcrição original retornada também é salva no histórico.
 - PDFs baseados em imagem ou digitalizados podem ter transcrição menos precisa.
